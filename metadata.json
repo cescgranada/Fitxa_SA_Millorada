@@ -1,5 +1,5 @@
 {
-  "name": "Assistent Pedagògic Nou Patufet",
+  "name": "Millorem les fitxes de la SA",
   "description": "Una eina intel·ligent per al disseny curricular LOMLOE basada en el projecte educatiu de l'Escola Nou Patufet.",
   "requestFramePermissions": [
     "camera"
