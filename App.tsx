@@ -1,17 +1,15 @@
 
 import React, { useState, useRef, useMemo } from 'react';
-import { SAPhase, AppStep, PedagogicalAnalysis, SAPhaseLabels, EVALUATION_INSTRUMENTS } from './types';
+import { SAPhase, AppStep, PedagogicalAnalysis, SAPhaseLabels, EVALUATION_INSTRUMENTS, GroupingType, OUTPUT_FORMATS } from './types';
 import * as geminiService from './geminiService';
-
-// --- Global UI Components ---
 
 const Header: React.FC = () => (
   <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
     <div className="flex items-center gap-3">
       <div className="bg-indigo-600 p-2 rounded-lg text-white font-bold text-xl">NP</div>
       <div>
-        <h1 className="text-lg font-bold text-slate-800 leading-tight">Assistent Pedagògic</h1>
-        <p className="text-xs text-slate-500 font-medium tracking-wide uppercase">Escola Nou Patufet • LOMLOE</p>
+        <h1 className="text-lg font-bold text-slate-800 leading-tight">Disseny Instruccional</h1>
+        <p className="text-xs text-slate-500 font-medium tracking-wide uppercase">Millora de Fitxes • Escola Nou Patufet</p>
       </div>
     </div>
   </header>
@@ -19,9 +17,9 @@ const Header: React.FC = () => (
 
 const ProgressBar: React.FC<{ step: AppStep }> = ({ step }) => {
   const steps = [
-    { id: 1, label: '📂 Inici' },
+    { id: 1, label: '📂 Configuració' },
     { id: 2, label: '🧠 Millora' },
-    { id: 3, label: '🤝 DUA' },
+    { id: 3, label: '📋 Guia Alumne' },
     { id: 4, label: '📝 Avaluació' },
     { id: 5, label: '📊 Resum' },
   ];
@@ -39,8 +37,6 @@ const ProgressBar: React.FC<{ step: AppStep }> = ({ step }) => {
   );
 };
 
-// --- Main App ---
-
 const App: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<AppStep>(AppStep.UPLOAD);
   const [phase, setPhase] = useState<SAPhase>(SAPhase.INICIAL);
@@ -48,213 +44,217 @@ const App: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>('gemini-3-flash-preview');
   const [temperature, setTemperature] = useState<number>(0.7);
+  const [groupingType, setGroupingType] = useState<GroupingType>(GroupingType.INDIVIDUAL);
+  const [memberCount, setMemberCount] = useState<number>(4);
+  const [userComments, setUserComments] = useState<string>('');
   const [analysis, setAnalysis] = useState<PedagogicalAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- Actions ---
-
-  const reset = () => {
-    setCurrentStep(AppStep.UPLOAD);
-    setFileContent('');
-    setSelectedFile(null);
-    setAnalysis(null);
-    setError(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-      if (file.type === "text/plain" || file.name.endsWith('.md')) {
-        const reader = new FileReader();
-        reader.onload = (e) => setFileContent(e.target?.result as string);
-        reader.readAsText(file);
-      } else {
-        setFileContent(`[Document carregat: ${file.name}. Contingut llest per a l'anàlisi pedagògica.]`);
-      }
+      const reader = new FileReader();
+      reader.onload = (e) => setFileContent(e.target?.result as string);
+      reader.readAsText(file);
     }
   };
 
   const handleStartAnalysis = async () => {
-    if (!fileContent.trim() && !selectedFile) {
-      setError("Cal pujar un document o escriure text.");
+    if (!fileContent.trim()) {
+      setError("Cal introduir algun contingut.");
       return;
     }
     setLoading(true);
     setError(null);
     try {
       const result = await geminiService.analyzeAndImprove(fileContent, phase, selectedModel, temperature);
-      if (!result || !result.improved) throw new Error("Format de resposta no vàlid o incomplet.");
-      
       setAnalysis({
         originalContent: fileContent,
         improved: result.improved,
-        improvementSuggestion: result.improvementSuggestion || "Millora pedagògica detectada.",
-        udlVersion: '',
+        improvementSuggestion: result.improvementSuggestion,
+        studentGuide: '',
+        groupingType,
+        memberCount,
+        userComments
       });
       setCurrentStep(AppStep.ANALYSIS);
     } catch (err: any) {
-      setError(err.message || "Error en l'anàlisi. Reintenta-ho.");
+      setError(err.message || "Error en l'anàlisi.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectOutput = async (output: string) => {
+  const handleGenerateGuide = async (outputFormat: string) => {
     if (!analysis?.improved) return;
     setLoading(true);
     try {
-      const udl = await geminiService.generateUDL(JSON.stringify(analysis.improved), output, selectedModel, temperature);
-      setAnalysis({ ...analysis, selectedOutput: output, udlVersion: udl });
-      setCurrentStep(AppStep.ADAPTATION);
+      const guide = await geminiService.generateStudentGuide(
+        analysis.improved,
+        outputFormat,
+        groupingType,
+        memberCount,
+        userComments,
+        selectedModel
+      );
+      setAnalysis({ ...analysis, selectedOutput: outputFormat, studentGuide: guide });
+      setCurrentStep(AppStep.STUDENT_GUIDE);
     } catch (err) {
-      setError("Error en generar la versió DUA.");
+      setError("Error generant la fitxa de l'alumne.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleSelectInstrument = async (inst: string) => {
-    if (!analysis?.improved) return;
+    if (!analysis) return;
     setLoading(true);
     try {
-      const evalText = await geminiService.generateEvaluation(JSON.stringify(analysis.improved), inst, selectedModel, temperature);
-      const summary = await geminiService.generateSummary(JSON.stringify(analysis.improved), selectedModel);
+      const evalText = await geminiService.generateEvaluation(analysis.studentGuide, inst, selectedModel);
+      const summary = await geminiService.generateSummary(analysis.studentGuide, selectedModel);
       setAnalysis({ ...analysis, evaluationInstrument: evalText, selectedInstrumentName: inst, summaryTable: summary });
       setCurrentStep(AppStep.SUMMARY);
     } catch (err) {
-      setError("Error en el procés d'avaluació.");
+      setError("Error en l'avaluació.");
     } finally {
       setLoading(false);
     }
   };
 
-  // --- Export Data Memo ---
-
-  const exportData = useMemo(() => {
-    if (!analysis?.improved) return null;
-    const { improved, selectedOutput, udlVersion, selectedInstrumentName, evaluationInstrument } = analysis;
-    
-    const contentText = `TITOL: ${improved.titol || 'Sense títol'}\nCONTEXT: ${improved.context || ''}\nOBJECTIUS:\n${(improved.objectius || []).map(o => '- ' + o).join('\n')}\n\nDESENVOLUPAMENT:\n${(improved.desenvolupament || []).map(d => (d.nom || '') + ': ' + (d.descripcio || '')).join('\n')}\n\nOUTPUT SELECCIONAT: ${selectedOutput || 'Pendent'}\n\nADAPTACIÓ DUA:\n${udlVersion || 'N/A'}\n\nAVALUACIÓ (${selectedInstrumentName || 'N/A'}):\n${evaluationInstrument || 'Pendent'}`;
-
-    return {
-      markdown: `# SA: ${improved.titol || 'Sense títol'}\n\n${contentText}`,
-      latex: `\\documentclass[12pt]{article}\n\\usepackage[utf8]{inputenc}\n\\usepackage[t1]{sourcesanspro}\n\\usepackage[catalan]{babel}\n\\begin{document}\n\\section*{Fitxa Pedagògica}\n${contentText.replace(/_/g, '\\_').replace(/%/g, '\\%')}\n\\end{document}`,
-      python: `from fpdf import FPDF\npdf = FPDF()\npdf.add_page()\npdf.set_font("Arial", size=12)\npdf.multi_cell(0, 10, """${contentText.replace(/"/g, "'")}""")\npdf.output("Fitxa_NouPatufet.pdf")`
-    };
-  }, [analysis]);
-
-  // --- Render Views ---
-
   const renderUpload = () => (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-6">
-      <div className="text-center space-y-1">
-        <h2 className="text-xl font-bold text-slate-800">Assistent Pedagògic Nou Patufet 👋</h2>
-        <p className="text-slate-500 text-sm">Configura la teva Situació d'Aprenentatge</p>
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="text-center space-y-2">
+        <h2 className="text-2xl font-black text-slate-800">Disseny de l'Activitat</h2>
+        <p className="text-slate-500 text-sm">Configura els paràmetres logístics i pedagògics</p>
       </div>
-      
-      <div className="space-y-4">
-        <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Model d'IA</span>
-              <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} className="w-full p-2 text-xs font-bold bg-white border border-slate-200 rounded-lg text-slate-700">
-                <option value="gemini-3-flash-preview">Gemini 3 Flash (Ràpid)</option>
-                <option value="gemini-3-pro-preview">Gemini 3 Pro (Avançat)</option>
-                <option value="gemini-flash-lite-latest">Gemini Flash Lite</option>
-              </select>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-6">
+          <section>
+            <label className="text-xs font-black text-indigo-600 uppercase tracking-widest block mb-3">1. Tipus d'Agrupament</label>
+            <div className="flex gap-3">
+              {[GroupingType.INDIVIDUAL, GroupingType.GRUP].map(type => (
+                <button 
+                  key={type}
+                  onClick={() => setGroupingType(type)}
+                  className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm border-2 transition-all ${groupingType === type ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-105' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200'}`}
+                >
+                  {type}
+                </button>
+              ))}
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Temperatura ({temperature})</span>
+            {groupingType === GroupingType.GRUP && (
+              <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                <label className="text-[10px] font-bold text-slate-400 block mb-2">Nombre de membres per grup:</label>
+                <input 
+                  type="number" min="2" max="10" 
+                  value={memberCount} 
+                  onChange={e => setMemberCount(parseInt(e.target.value))}
+                  className="w-20 p-2 border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-700"
+                />
               </div>
-              <input type="range" min="0" max="1" step="0.1" value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} className="w-full accent-indigo-600" />
-            </div>
-          </div>
+            )}
+          </section>
+
+          <section>
+            <label className="text-xs font-black text-indigo-600 uppercase tracking-widest block mb-3">2. Comentaris de personalització</label>
+            <textarea 
+              value={userComments}
+              onChange={e => setUserComments(e.target.value)}
+              placeholder="Ex: Posa èmfasi en el treball de camp, o adapta-ho per a 1r d'ESO..."
+              className="w-full h-24 p-3 text-sm bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all"
+            />
+          </section>
         </div>
 
-        <div>
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">1. Document base (PDF, Word, Text)</span>
-          {!selectedFile ? (
-            <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center cursor-pointer hover:bg-slate-50 transition-all">
-              <span className="text-2xl mb-2 block">📄</span>
-              <p className="text-xs text-slate-400 font-medium">Clica per carregar un document</p>
-              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept=".pdf,.doc,.docx,.md,.txt" />
-            </div>
-          ) : (
-            <div className="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
-              <span className="text-xs font-bold text-indigo-700 truncate">{selectedFile.name}</span>
-              <button onClick={() => { setSelectedFile(null); setFileContent(''); }} className="text-lg">🗑️</button>
-            </div>
-          )}
+        <div className="space-y-6">
+          <section>
+            <label className="text-xs font-black text-indigo-600 uppercase tracking-widest block mb-3">3. Document o Text Base</label>
+            <textarea 
+              className="w-full h-48 p-4 text-sm bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-indigo-500 outline-none"
+              value={fileContent} 
+              onChange={e => setFileContent(e.target.value)} 
+              placeholder="Enganxa aquí el contingut de la teva unitat o activitat..." 
+            />
+            <button onClick={() => fileInputRef.current?.click()} className="mt-2 text-xs font-bold text-indigo-600 hover:underline">
+              {selectedFile ? `✓ ${selectedFile.name}` : "📁 Carregar arxiu (PDF/Word/TXT)"}
+            </button>
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept=".pdf,.doc,.docx,.md,.txt" />
+          </section>
         </div>
-        
-        <div>
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">2. Contingut / Edició</span>
-          <textarea className="w-full h-32 p-4 text-sm bg-slate-50 border-slate-200 rounded-xl" value={fileContent} onChange={e => setFileContent(e.target.value)} placeholder="Escriu o edita el contingut aquí..." />
-        </div>
-        
-        <div className="grid grid-cols-2 gap-2">
+      </div>
+
+      <div className="border-t border-slate-100 pt-6">
+        <label className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-4">4. Fase de la Situació d'Aprenentatge</label>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {Object.entries(SAPhaseLabels).map(([k, v]) => (
-            <button key={k} onClick={() => setPhase(k as SAPhase)} className={`p-3 text-[10px] font-bold rounded-lg border transition-all ${phase === k ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+            <button key={k} onClick={() => setPhase(k as SAPhase)} className={`p-3 text-[10px] font-bold rounded-xl border-2 transition-all ${phase === k ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200'}`}>
               {v}
             </button>
           ))}
         </div>
       </div>
-      
-      <button disabled={loading} onClick={handleStartAnalysis} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 disabled:opacity-50">
-        {loading ? 'PREPARANT IA...' : '🚀 CONTINUAR'}
+
+      <button disabled={loading} onClick={handleStartAnalysis} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-lg shadow-xl hover:bg-indigo-700 disabled:opacity-50 transform active:scale-95 transition-all">
+        {loading ? 'ANALITZANT PROPOSTA...' : 'GENERAR PROPOSTA DE MILLORA 🧠'}
       </button>
     </div>
   );
 
   const renderAnalysis = () => (
-    <div className="space-y-6">
-      <div className="bg-indigo-600 text-white p-6 rounded-2xl shadow-lg">
-        <h3 className="text-xs font-bold uppercase tracking-widest opacity-80 mb-2">Proposta de Millora</h3>
-        <p className="text-lg font-medium leading-relaxed italic">"{analysis?.improvementSuggestion}"</p>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="bg-indigo-900 text-white p-8 rounded-3xl shadow-2xl border-4 border-indigo-500">
+        <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-4 text-indigo-300">Rigor Acadèmic: Proposta de Millora</h3>
+        <p className="text-xl font-medium leading-relaxed italic">{analysis?.improvementSuggestion}</p>
       </div>
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-8">
-        <div className="space-y-2">
-          <h2 className="text-3xl font-black text-slate-800">{analysis?.improved?.titol || 'Sense títol'}</h2>
-          <div className="h-1 w-20 bg-indigo-500 rounded-full" />
+
+      <div className="bg-white rounded-3xl shadow-sm border-2 border-slate-100 p-8 space-y-10">
+        <div className="space-y-4">
+          <h2 className="text-4xl font-black text-slate-800 leading-tight">{analysis?.improved?.titol}</h2>
+          <div className="h-2 w-32 bg-indigo-600 rounded-full" />
         </div>
-        <section className="space-y-4">
-          <h4 className="text-xs font-bold text-indigo-500 uppercase tracking-widest">Context</h4>
-          <p className="text-slate-600 leading-relaxed">{analysis?.improved?.context}</p>
-        </section>
-        <section className="space-y-4">
-          <h4 className="text-xs font-bold text-indigo-500 uppercase tracking-widest">Objectius</h4>
-          <ul className="space-y-2">
-            {analysis?.improved?.objectius?.map((o, i) => (
-              <li key={i} className="flex gap-3 items-start text-slate-600">
-                <span className="text-indigo-400 font-bold">•</span> {o}
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section className="space-y-4">
-          <h4 className="text-xs font-bold text-indigo-500 uppercase tracking-widest">Desenvolupament</h4>
-          <div className="space-y-6 border-l-2 border-slate-100 pl-6">
-            {analysis?.improved?.desenvolupament?.map((f, i) => (
-              <div key={i} className="relative">
-                <div className="absolute -left-[31px] top-1 w-2.5 h-2.5 bg-indigo-500 rounded-full" />
-                <h5 className="font-bold text-slate-800 mb-1">{f.nom}</h5>
-                <p className="text-sm text-slate-500 leading-relaxed">{f.descripcio}</p>
-              </div>
-            ))}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+          <section className="space-y-4">
+            <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest">Objectius Didàctics</h4>
+            <ul className="space-y-3">
+              {analysis?.improved?.objectius?.map((o, i) => (
+                <li key={i} className="flex gap-4 items-start text-slate-700 font-medium">
+                  <span className="flex-shrink-0 w-6 h-6 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-[10px] font-bold">{i+1}</span>
+                  {o}
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="space-y-4">
+            <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest">Configuració Logística</h4>
+            <div className="bg-slate-50 p-4 rounded-2xl space-y-2 border-l-4 border-indigo-500">
+              <p className="text-sm font-bold text-slate-700">Agrupament: <span className="text-indigo-600">{groupingType}</span></p>
+              {groupingType === GroupingType.GRUP && <p className="text-xs font-bold text-slate-500">Membres: {memberCount}</p>}
+              {userComments && <p className="text-xs italic text-slate-500 mt-2">"{userComments}"</p>}
+            </div>
+          </section>
+        </div>
+
+        <section className="space-y-6 pt-10 border-t-2 border-slate-50">
+          <div className="text-center space-y-2">
+            <h4 className="text-xl font-black text-slate-800">Selecciona el Format de la Fitxa Final</h4>
+            <p className="text-slate-500 text-sm font-medium italic">Tria com vols presentar la informació als teus alumnes</p>
           </div>
-        </section>
-        <section className="space-y-4 pt-4 border-t border-slate-100">
-          <h4 className="text-sm font-bold text-slate-800">🎯 Tria el teu Output (Producte Final)</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {analysis?.improved?.outputs?.map((out, i) => (
-              <button key={i} onClick={() => handleSelectOutput(out)} className="p-4 text-left border border-slate-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-200 transition-all text-sm font-medium">
-                {out}
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {OUTPUT_FORMATS.map((out) => (
+              <button 
+                key={out.id} 
+                onClick={() => handleGenerateGuide(out.label)}
+                className="group p-6 bg-white border-4 border-slate-100 rounded-3xl hover:border-indigo-500 hover:bg-indigo-50 transition-all text-center space-y-3 transform hover:-translate-y-1"
+              >
+                <span className="text-4xl block group-hover:scale-125 transition-transform">{out.icon}</span>
+                <span className="text-sm font-black text-slate-800 uppercase tracking-tight">{out.label}</span>
               </button>
             ))}
           </div>
@@ -263,31 +263,48 @@ const App: React.FC = () => {
     </div>
   );
 
-  const renderAdaptation = () => (
-    <div className="space-y-6">
-      <div className="bg-amber-500 text-white p-6 rounded-2xl shadow-lg">
-        <h3 className="text-xs font-bold uppercase tracking-widest opacity-80 mb-1">Versió DUA</h3>
-        <p className="font-medium">Accesibilitat Universal per a l'output: {analysis?.selectedOutput}</p>
+  const renderStudentGuide = () => (
+    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 pb-24">
+      <div className="bg-amber-500 text-white p-6 rounded-3xl shadow-xl flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <span className="text-4xl">📋</span>
+          <div>
+            <h3 className="text-xs font-black uppercase tracking-widest opacity-80">Guia de Treball de l'Alumne</h3>
+            <p className="font-bold text-lg">Format: {analysis?.selectedOutput}</p>
+          </div>
+        </div>
       </div>
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 whitespace-pre-wrap leading-loose text-slate-700 font-medium italic">
-        {analysis?.udlVersion}
+      
+      <div className="bg-white rounded-3xl shadow-2xl border-2 border-slate-100 p-10 prose prose-slate max-w-none prose-headings:font-black prose-headings:text-slate-800 prose-p:text-slate-600 prose-p:leading-relaxed prose-li:font-medium">
+        <div className="bg-slate-50 p-4 rounded-xl mb-8 flex gap-4 text-xs font-bold text-slate-500 border border-slate-200">
+          <span>👥 {groupingType} {groupingType === GroupingType.GRUP ? `(${memberCount} membres)` : ''}</span>
+          <span>📅 Fase: {SAPhaseLabels[phase]}</span>
+        </div>
+        <div className="whitespace-pre-wrap">
+          {analysis?.studentGuide}
+        </div>
       </div>
-      <button onClick={() => setCurrentStep(AppStep.EVALUATION_SELECT)} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-bold shadow-lg">
-        📝 SEGÜENT: TRIA INSTRUMENT D'AVALUACIÓ
-      </button>
+
+      <div className="flex flex-col gap-4">
+        <button onClick={() => setCurrentStep(AppStep.EVALUATION_SELECT)} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xl shadow-2xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-3">
+          <span>📝 DISSENYAR L'AVALUACIÓ</span>
+          <span className="text-2xl">→</span>
+        </button>
+      </div>
     </div>
   );
 
   const renderEvaluationSelect = () => (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-6">
-      <div className="text-center mb-6">
-        <h2 className="text-xl font-bold text-slate-800">Quin instrument d'avaluació prefereixes?</h2>
+    <div className="bg-white rounded-3xl shadow-sm border-2 border-slate-100 p-10 space-y-8 animate-in fade-in duration-500">
+      <div className="text-center space-y-2">
+        <h2 className="text-3xl font-black text-slate-800">Avaluació de la Tasca</h2>
+        <p className="text-slate-500 font-medium">Tria l'instrument que millor s'adapti a la Guia de Treball</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
         {EVALUATION_INSTRUMENTS.map((inst, i) => (
-          <button key={i} onClick={() => handleSelectInstrument(inst.name)} className="p-4 text-left border border-slate-100 bg-slate-50/50 rounded-xl hover:bg-indigo-600 hover:text-white transition-all">
-            <h5 className="font-bold text-sm mb-1">{inst.name}</h5>
-            <p className="text-[10px] opacity-70 leading-tight">{inst.desc}</p>
+          <button key={i} onClick={() => handleSelectInstrument(inst.name)} className="p-6 text-left border-4 border-slate-50 bg-slate-50/50 rounded-3xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group">
+            <h5 className="font-black text-slate-800 group-hover:text-indigo-600 mb-2">{inst.name}</h5>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed">{inst.desc}</p>
           </button>
         ))}
       </div>
@@ -295,66 +312,81 @@ const App: React.FC = () => {
   );
 
   const renderSummary = () => (
-    <div className="space-y-8 pb-20">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-800 text-white px-6 py-4">
-          <h3 className="text-sm font-bold uppercase tracking-widest">📊 Resum Pedagògic</h3>
+    <div className="space-y-8 pb-32 animate-in fade-in duration-700">
+      <div className="bg-white rounded-3xl shadow-sm border-2 border-slate-100 overflow-hidden">
+        <div className="bg-slate-900 text-white px-8 py-6">
+          <h3 className="text-xs font-black uppercase tracking-[0.3em]">📊 Marc Curricular LOMLOE</h3>
         </div>
-        <table className="w-full text-xs text-left">
-          <tbody className="divide-y divide-slate-100">
+        <div className="p-8">
+          <div className="grid grid-cols-1 gap-6">
             {[
-              { label: 'Competències LOMLOE', val: analysis?.summaryTable?.competencies },
-              { label: 'Sabers Bàsics', val: analysis?.summaryTable?.sabers },
-              { label: 'ODS', val: analysis?.summaryTable?.ods },
-              { label: 'Eixos Escola', val: analysis?.summaryTable?.eixosEscola },
-              { label: 'Competències ABP', val: analysis?.summaryTable?.competenciesABP },
+              { label: 'Competències Específiques', val: analysis?.summaryTable?.competencies, color: 'indigo' },
+              { label: 'Sabers Bàsics', val: analysis?.summaryTable?.sabers, color: 'amber' },
+              { label: 'ODS Relacionats', val: analysis?.summaryTable?.ods, color: 'emerald' },
+              { label: 'Competències ABP', val: analysis?.summaryTable?.competenciesABP, color: 'rose' },
             ].map((row, i) => (
-              <tr key={i}>
-                <td className="px-6 py-4 bg-slate-50 font-bold text-slate-600 w-1/3">{row.label}</td>
-                <td className="px-6 py-4 text-slate-500 leading-relaxed">{row.val?.join(', ') || 'N/A'}</td>
-              </tr>
+              <div key={i} className="space-y-2">
+                <span className={`text-[10px] font-black uppercase tracking-widest text-${row.color}-600`}>{row.label}</span>
+                <div className="flex flex-wrap gap-2">
+                  {row.val?.map((v, idx) => (
+                    <span key={idx} className={`px-3 py-1 bg-${row.color}-50 text-${row.color}-700 text-xs font-bold rounded-lg border border-${row.color}-100`}>{v}</span>
+                  ))}
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
-      <div className="bg-indigo-50 border border-indigo-100 p-8 rounded-2xl">
-        <h3 className="text-lg font-bold text-indigo-900 mb-4">📝 Instrument: {analysis?.selectedInstrumentName}</h3>
-        <div className="whitespace-pre-wrap text-sm text-indigo-900/80 leading-relaxed font-medium">
+
+      <div className="bg-white border-2 border-slate-100 p-10 rounded-3xl shadow-xl">
+        <h3 className="text-2xl font-black text-slate-800 mb-6 flex items-center gap-3">
+          <span className="text-indigo-600">📝</span> {analysis?.selectedInstrumentName}
+        </h3>
+        <div className="whitespace-pre-wrap text-slate-600 font-medium leading-relaxed">
           {analysis?.evaluationInstrument}
         </div>
       </div>
-      <button onClick={reset} className="w-full py-4 bg-slate-800 text-white rounded-xl font-bold hover:bg-black transition-all">
-        🔄 COMENÇAR NOVA FITXA
+      
+      <button onClick={() => window.location.reload()} className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black hover:bg-black transition-all shadow-xl">
+        🔄 CREAR UNA NOVA PROPOSTA
       </button>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24">
+    <div className="min-h-screen bg-slate-50 font-sans selection:bg-indigo-100 selection:text-indigo-900">
       <Header />
       <ProgressBar step={currentStep} />
       <main className="max-w-4xl mx-auto p-4 md:p-8">
         {loading && (
-          <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[100] flex items-center justify-center text-center p-4">
-            <div className="space-y-4">
-              <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="text-indigo-600 font-bold uppercase tracking-widest text-sm">Processant la petició...</p>
+          <div className="fixed inset-0 bg-indigo-900/10 backdrop-blur-md z-[100] flex items-center justify-center">
+            <div className="bg-white p-10 rounded-3xl shadow-2xl text-center space-y-6 max-w-xs animate-in zoom-in-95 duration-300">
+              <div className="w-16 h-16 border-8 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <div className="space-y-2">
+                <p className="text-indigo-600 font-black uppercase tracking-widest text-sm">Transformant Contingut</p>
+                <p className="text-slate-400 text-[10px] font-bold">L'IA està aplicant criteris de disseny instruccional...</p>
+              </div>
             </div>
           </div>
         )}
-        {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl text-xs font-bold mb-4 border border-red-100 uppercase">{error}</div>}
+        {error && <div className="bg-rose-50 text-rose-600 p-6 rounded-2xl text-xs font-black mb-8 border-2 border-rose-100 uppercase tracking-widest animate-shake">{error}</div>}
         
         {currentStep === AppStep.UPLOAD && renderUpload()}
         {currentStep === AppStep.ANALYSIS && renderAnalysis()}
-        {currentStep === AppStep.ADAPTATION && renderAdaptation()}
+        {currentStep === AppStep.STUDENT_GUIDE && renderStudentGuide()}
         {currentStep === AppStep.EVALUATION_SELECT && renderEvaluationSelect()}
         {currentStep === AppStep.SUMMARY && renderSummary()}
       </main>
 
-      {analysis && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-4 shadow-2xl z-40 flex justify-center gap-4">
-          <button onClick={() => navigator.clipboard.writeText(exportData?.markdown || '')} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-bold">📥 MD (WORD)</button>
-          <button onClick={() => navigator.clipboard.writeText(exportData?.latex || '')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold">📥 LATEX</button>
+      {/* Download bar only visible in final steps, not in Analysis as requested */}
+      {analysis?.studentGuide && (currentStep === AppStep.STUDENT_GUIDE || currentStep === AppStep.SUMMARY) && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 p-6 shadow-2xl z-40 flex justify-center gap-6 animate-in slide-in-from-bottom duration-500">
+          <button onClick={() => navigator.clipboard.writeText(analysis.studentGuide)} className="px-8 py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all flex items-center gap-3">
+            <span>📋 Copiar Guia</span>
+          </button>
+          <button className="px-8 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all">
+            📥 Descarregar PDF
+          </button>
         </div>
       )}
     </div>

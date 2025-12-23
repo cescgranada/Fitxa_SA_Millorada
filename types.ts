@@ -13,6 +13,20 @@ export const SAPhaseLabels: Record<SAPhase, string> = {
   [SAPhase.APLICACIO]: 'Aplicació (Com ho transfereixo?)'
 };
 
+export enum GroupingType {
+  INDIVIDUAL = 'Individual',
+  GRUP = 'Treball en Grup'
+}
+
+export const OUTPUT_FORMATS = [
+  { id: 'mapa', label: 'Mapa conceptual', icon: '🌿' },
+  { id: 'resum', label: 'Resum executiu', icon: '📄' },
+  { id: 'preguntes', label: 'Guia de preguntes', icon: '❓' },
+  { id: 'infografia', label: 'Infografia de text', icon: '📊' },
+  { id: 'cas', label: 'Estudi de cas', icon: '🔎' },
+  { id: 'exercicis', label: 'Exercicis pràctics', icon: '✏️' }
+];
+
 export interface ActivityPhase {
   nom: string;
   descripcio: string;
@@ -31,22 +45,25 @@ export interface PedagogicalAnalysis {
   improved: ImprovedContent;
   selectedOutput?: string;
   improvementSuggestion: string;
-  udlVersion: string;
+  studentGuide: string;
+  groupingType?: GroupingType;
+  memberCount?: number;
+  userComments?: string;
   evaluationInstrument?: string;
   selectedInstrumentName?: string;
   summaryTable?: {
     competencies: string[];
     sabers: string[];
     ods: string[];
-    eixosEscola: string[]; // Feminisme, Territori, Sostenibilitat
-    competenciesABP: string[]; // ABPxODS
+    eixosEscola: string[];
+    competenciesABP: string[];
   };
 }
 
 export enum AppStep {
   UPLOAD = 1,
   ANALYSIS = 2,
-  ADAPTATION = 3,
+  STUDENT_GUIDE = 3,
   EVALUATION_SELECT = 4,
   SUMMARY = 5
 }

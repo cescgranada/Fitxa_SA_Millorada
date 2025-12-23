@@ -1,60 +1,43 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { SAPhase, SAPhaseLabels } from "./types";
+import { SAPhase, SAPhaseLabels, GroupingType } from "./types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const SYSTEM_PROMPT = `Ets un expert en pedagogia i disseny curricular (LOMLOE Catalunya), especialitzat en l'ESO i l'Escola Nou Patufet.
+const SYSTEM_PROMPT = `Ets un expert en disseny instruccional i pedagogia (LOMLOE Catalunya). La teva funció és analitzar propostes educatives i transformar-les en material d'alta qualitat per a l'alumnat.
 
 REGLA DE RENDERITZAT:
-- NO utilitzis markdown brut (** o ###) en les explicacions textuals.
-- Per a fórmules matemàtiques o químiques, utilitza caràcters Unicode (ex: x², H₂O, √2, ≠) perquè es llegeixi fluidament.
+- Utilitza Unicode per a fórmules i símbols.
+- Llenguatge adaptat a l'estudiant (claredat, motivació i autonomia).
+- Estructura neta i professional.
 
-ESTRUCTURA DE LA FITXA:
-Tota fitxa millorada ha de tenir:
-1. Títol
-2. Context
-3. Objectius d'aprenentatge (en llista)
-4. Desenvolupament (Fases amb nom i descripcio)
-5. Proposta de 3-4 Outputs (productes finals) que l'alumne pot triar.
+Context Nou Patufet: Eixos de Territori, Feminisme, Sostenibilitat i Transformació.`;
 
-Context Pedagògic Nou Patufet:
-- Eixos: Territori, Feminisme, Món sostenible, Llengua catalana, Amor/Benestar, Transformació.
-- Competències ABP: Pensament sistèmic, Anticipació, Normativa, Estratègica, Col·laboració, Pensament crític, Autoconeixement, Resolució de problemes.
-
-Respon SEMPRE en CATALÀ i EXCLUSIVAMENT en format JSON.`;
-
-/**
- * Extreu i parseja el JSON de manera robusta, buscant el primer '{' i l'últim '}'
- */
 function robustJSONParse(text: string | undefined) {
-  if (!text) throw new Error("La resposta del model està buida.");
-  
+  if (!text) throw new Error("La resposta està buida.");
   try {
-    // Busquem el bloc JSON dins del text (per si hi ha markdown o text extra)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No s'ha trobat cap bloc de dades vàlid en la resposta.");
-    
+    if (!jsonMatch) throw new Error("No s'ha trobat bloc JSON.");
     return JSON.parse(jsonMatch[0]);
   } catch (e) {
-    console.error("Error detallat de parsing:", e, "Text rebut:", text);
-    throw new Error("La IA ha retornat dades en un format que no podem llegir. Reintenta-ho.");
+    throw new Error("Error en el format de dades de la IA.");
   }
 }
 
 export async function analyzeAndImprove(content: string, phase: SAPhase, modelName: string, temperature: number) {
-  const prompt = `Analitza i millora aquesta activitat per a la fase: ${SAPhaseLabels[phase]}.
+  const prompt = `Analitza aquesta proposta educativa i presenta una "Proposta de Millora" basada en criteris pedagògics rigorosos (Taxonomia de Bloom, claredat d'objectius).
+  Fase SA: ${SAPhaseLabels[phase]}
   Contingut: ${content}
 
-  Esquema obligatori:
+  Torna un JSON amb:
   {
-    "improvementSuggestion": "string",
+    "improvementSuggestion": "Anàlisi detallada i justificació pedagògica de la millora",
     "improved": {
-      "titol": "string",
-      "context": "string",
-      "objectius": ["string"],
-      "desenvolupament": [{"nom": "string", "descripcio": "string"}],
-      "outputs": ["string"]
+      "titol": "Títol suggerit",
+      "context": "Context educatiu",
+      "objectius": ["Llista d'objectius d'aprenentatge clars"],
+      "desenvolupament": [{"nom": "Fase", "descripcio": "Detall"}],
+      "outputs": ["Format 1", "Format 2"]
     }
   }`;
 
@@ -63,98 +46,67 @@ export async function analyzeAndImprove(content: string, phase: SAPhase, modelNa
     contents: prompt,
     config: {
       systemInstruction: SYSTEM_PROMPT,
-      temperature: temperature,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          improvementSuggestion: { type: Type.STRING },
-          improved: {
-            type: Type.OBJECT,
-            properties: {
-              titol: { type: Type.STRING },
-              context: { type: Type.STRING },
-              objectius: { type: Type.ARRAY, items: { type: Type.STRING } },
-              desenvolupament: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    nom: { type: Type.STRING },
-                    descripcio: { type: Type.STRING }
-                  }
-                }
-              },
-              outputs: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: ["titol", "context", "objectius", "desenvolupament", "outputs"]
-          }
-        },
-        required: ["improvementSuggestion", "improved"]
-      }
+      temperature,
+      responseMimeType: "application/json"
     }
   });
 
-  const data = robustJSONParse(response.text);
-  
-  // Normalització: Si la IA ha tornat les dades "planes" sense l'embolcall 'improved'
-  if (!data.improved && data.titol) {
-    return {
-      improvementSuggestion: data.improvementSuggestion || "Millora pedagògica aplicada.",
-      improved: data
-    };
-  }
-  
-  return data;
+  return robustJSONParse(response.text);
 }
 
-export async function generateUDL(content: string, selectedOutput: string, modelName: string, temperature: number) {
-  const prompt = `Genera una adaptació DUA per a l'activitat. 
-  Producte final triat: ${selectedOutput}
-  Contingut estructurat: ${content}`;
+export async function generateStudentGuide(
+  improvedContent: any, 
+  selectedOutput: string, 
+  groupingType: GroupingType, 
+  memberCount: number, 
+  userComments: string,
+  modelName: string
+) {
+  const prompt = `CREA LA FITXA PER A L'ALUMNAT (Guia de Treball completa).
+  
+  Dades de configuració:
+  - Contingut Millorat: ${JSON.stringify(improvedContent)}
+  - Format d'Output: ${selectedOutput}
+  - Agrupament: ${groupingType} ${groupingType === GroupingType.GRUP ? `(${memberCount} membres)` : ''}
+  - Comentaris personalització usuari: ${userComments}
+
+  La fitxa ha de contenir:
+  1. Títol engrescador.
+  2. Introducció/Repte.
+  3. Què hem de fer? (Instruccions detallades segons el format triat).
+  4. Com ens organitzem? (Considerant l'agrupament triat).
+  5. Recursos o consells per a l'èxit.
+  
+  Genera un text Markdown net, sense comentaris interns, llist per ser lliurat als alumnes.`;
 
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,
-    config: { systemInstruction: SYSTEM_PROMPT, temperature }
+    config: { systemInstruction: SYSTEM_PROMPT }
   });
 
-  return response.text || "No s'ha pogut generar l'adaptació.";
+  return response.text || "Error generant la guia.";
 }
 
-export async function generateEvaluation(content: string, instrumentName: string, modelName: string, temperature: number) {
-  const prompt = `Crea l'instrument d'avaluació "${instrumentName}" per a aquesta activitat: ${content}`;
-
+export async function generateEvaluation(content: string, instrumentName: string, modelName: string) {
+  const prompt = `Crea l'instrument d'avaluació "${instrumentName}" per a la següent fitxa d'alumne: ${content}`;
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,
-    config: { systemInstruction: SYSTEM_PROMPT, temperature }
+    config: { systemInstruction: SYSTEM_PROMPT }
   });
-
-  return response.text || "No s'ha pogut generar l'instrument.";
+  return response.text;
 }
 
 export async function generateSummary(content: string, modelName: string) {
-  const prompt = `Genera el resum curricular LOMLOE/Nou Patufet per a: ${content}`;
-
+  const prompt = `Genera el resum curricular (LOMLOE) per a: ${content}`;
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,
     config: {
       systemInstruction: SYSTEM_PROMPT,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          competencies: { type: Type.ARRAY, items: { type: Type.STRING } },
-          sabers: { type: Type.ARRAY, items: { type: Type.STRING } },
-          ods: { type: Type.ARRAY, items: { type: Type.STRING } },
-          eixosEscola: { type: Type.ARRAY, items: { type: Type.STRING } },
-          competenciesABP: { type: Type.ARRAY, items: { type: Type.STRING } }
-        }
-      }
+      responseMimeType: "application/json"
     }
   });
-
   return robustJSONParse(response.text);
 }
