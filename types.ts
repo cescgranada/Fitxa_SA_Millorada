@@ -18,14 +18,11 @@ export enum GroupingType {
   GRUP = 'Treball en Grup'
 }
 
-export const OUTPUT_FORMATS = [
-  { id: 'mapa', label: 'Mapa conceptual', icon: '🌿' },
-  { id: 'resum', label: 'Resum executiu', icon: '📄' },
-  { id: 'preguntes', label: 'Guia de preguntes', icon: '❓' },
-  { id: 'infografia', label: 'Infografia de text', icon: '📊' },
-  { id: 'cas', label: 'Estudi de cas', icon: '🔎' },
-  { id: 'exercicis', label: 'Exercicis pràctics', icon: '✏️' }
-];
+export interface ProductProposal {
+  id: string;
+  titol: string;
+  descripcio: string;
+}
 
 export interface ActivityPhase {
   nom: string;
@@ -39,10 +36,17 @@ export interface ImprovedContent {
   desenvolupament: ActivityPhase[];
 }
 
+export interface SummaryData {
+  competencies: { code: string; definition: string }[];
+  sabers: string[];
+  eixosEscola: { all: string[]; highlighted: string[] };
+  ods: { all: string[]; highlighted: string[] };
+  competenciesABP: { all: string[]; highlighted: string[] };
+}
+
 export interface PedagogicalAnalysis {
   originalContent: string;
   improved: ImprovedContent;
-  selectedOutput?: string;
   improvementSuggestion: string;
   studentGuide: string;
   groupingType: GroupingType;
@@ -50,20 +54,17 @@ export interface PedagogicalAnalysis {
   userComments: string;
   evaluationInstrument?: string;
   selectedInstrumentName?: string;
-  summaryTable?: {
-    competencies: string[];
-    sabers: string[];
-    ods: string[];
-    eixosEscola: string[];
-    competenciesABP: string[];
-  };
+  productProposals?: ProductProposal[];
+  selectedProduct?: ProductProposal;
+  summaryTable?: SummaryData;
 }
 
 export enum AppStep {
   UPLOAD = 1,
   ANALYSIS = 2,
-  STUDENT_GUIDE = 3,
-  SUMMARY = 4
+  PRODUCT_SELECTION = 3,
+  STUDENT_GUIDE = 4,
+  SUMMARY = 5
 }
 
 export const EVALUATION_INSTRUMENTS = [
@@ -73,7 +74,7 @@ export const EVALUATION_INSTRUMENTS = [
   { name: 'Rúbriques', desc: 'Taules que descriuen nivells de qualitat en l’assoliment de competències.' },
   { name: 'Autoavaluació', desc: 'Eina perquè l’alumnat reflexioni sobre el seu propi procés.' },
   { name: 'Contracte d’avaluació', desc: 'Acord entre docent i alumne sobre objectius i compromisos.' },
-  { name: 'Diari d’equip', desc: 'Registre col·laboratiu on els membres d’un grup documenten el progrés.' },
+  { name: 'Diari d’equip', desc: 'Registre col·laboratiu on els membres d’un grup documenten el progres.' },
   { name: 'Mapa conceptual', desc: 'Representació gràfica que mostra la relació entre conceptes.' },
   { name: 'Diana d’avaluació', desc: 'Eina visual que representa el grau d’assoliment en forma de gràfic circular.' },
   { name: 'Organitzadors gràfics', desc: 'Estructures visuals que ajuden a organitzar informació.' },
