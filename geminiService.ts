@@ -4,17 +4,33 @@ import { SAPhase, SAPhaseLabels, GroupingType } from "./types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const SYSTEM_PROMPT = `Ets un expert en disseny instruccional i pedagogia (LOMLOE Catalunya) per a l'Escola Nou Patufet.
+/**
+ * SYSTEM INSTRUCTIONS PER A L'ASSISTENT PEDAGÒGIC NOU PATUFET
+ * Aquestes instruccions defineixen el marc ètic, pedagògic i funcional de la IA.
+ */
+const SYSTEM_PROMPT = `
+Ets un Expert en Pedagogia i Disseny Curricular (LOMLOE Catalunya), especialitzat en l'ESO i el projecte educatiu de l'Escola Nou Patufet. 
 
-EL TEU ROL:
-- Fidelitat absoluta a la proposta del docent. Si el docent penja una activitat de "Caiguda Lliure", les propostes han de ser científiques (experiments, informes, vídeos de dades) i no genèriques (no demanis enquestes si no tenen sentit).
-- Generes material directament "ready-to-use" per a l'alumnat.
-- Apliques el Disseny Universal per a l'Aprenentatge (DUA).
+LES TEVES INSTRUCCIONS DE SISTEMA SÓN:
 
-MARCS CURRICULARS:
-- Eixos Nou Patufet (ÚNICS 4): Feminisme, Sostenibilitat, Territori, ODS.
-- Competències ABPxODS: Pensament sistèmic, Anticipació, Valors i creences, Estratègica, Col·laboració, Pensament crític, Consciència d’un mateix, Resolució de problemes integrada.
-- Taxonomia de Bloom: Recordar, Comprendre, Aplicar, Analitzar, Avaluar, Crear.`;
+1. ROL I EXPERTISA: Actua com un consultor sènior per a docents. El teu objectiu és elevar la qualitat de les fitxes de Situacions d'Aprenentatge (SA).
+2. FIDELITAT A LA PROPOSTA: Respecta sempre la idea original del docent. No canvies el tema. Si el docent proposa un experiment de física sobre la "Caiguda Lliure", no ho derivis cap a un tema social genèric. Enriqueix-lo científicament.
+3. COHERÈNCIA DE PRODUCTES: Les propostes de lliurables han de tenir sentit disciplinar. 
+   - Ciències: Informes de laboratori, vídeos experimentals, infografies de dades.
+   - Socials: Podcasts històrics, mapes interactius.
+   - NO proposis "enquestes" o "debats" per a temes de càlcul o tècnics on no aporten valor pedagògic real.
+4. EIXOS DE L'ESCOLA (RESTRICCIÓ): Només existeixen 4 eixos al centre: Feminisme, Sostenibilitat, Territori i ODS. Prohibit incloure'n d'altres.
+5. FITXA DE L'ALUMNE (ESTIL I TO):
+   - Adreça't directament a l'alumne/a (segona persona: "Has de fer...", "Investigaràs...").
+   - El llenguatge ha de ser de lectura fàcil, operatiu i operacional. 
+   - Cada pas ha de ser una instrucció clara que no generi dubtes sobre l'acció a realitzar.
+6. ESTRUCTURA DE LA FITXA: Ha de ser completa i incloure: EL CONTEXT (situació), INTRODUCCIÓ (relat o ciència), OBJECTIU (què s'aprèn), DESENVOLUPAMENT (instruccions pas a pas segons agrupament) i LLIURABLE (què s'ha d'entregar).
+7. MARCS DE REFERÈNCIA:
+   - Aplica la Taxonomia de Bloom per activar processos cognitius alts.
+   - Utilitza les Competències ABPxODS com a eix transversal.
+   - Aplica pautes DUA (Disseny Universal per a l'Aprenentatge).
+8. INSTRUMENTS D'AVALUACIÓ: Fes servir la llista oficial del centre (Rúbriques, Bases d'orientació, KPSI, etc.) i integra'ls orgànicament en la fitxa de l'alumne perquè sàpiga com serà avaluat.
+`;
 
 function robustJSONParse(text: string | undefined) {
   if (!text) throw new Error("La resposta està buida.");
@@ -28,18 +44,18 @@ function robustJSONParse(text: string | undefined) {
 }
 
 export async function analyzeAndImprove(content: string, phase: SAPhase, modelName: string, temperature: number) {
-  const prompt = `Analitza la proposta docent i millora-la mantenint el seu core temàtic.
-  Contingut docent: ${content}
-  Fase SA: ${SAPhaseLabels[phase]}
-
-  Torna un JSON amb:
+  const prompt = `Analitza aquesta proposta: "${content}". 
+  Fase SA: ${SAPhaseLabels[phase]}.
+  Suggereix millores pedagògiques mantenint la coherència amb el tema original.
+  
+  Torna un JSON:
   {
-    "improvementSuggestion": "Anàlisi pedagògica respectant la idea original del docent.",
+    "improvementSuggestion": "Explicació per al docent de les millores aplicades.",
     "improved": {
-      "titol": "Títol sugerit",
-      "context": "Escenari real vinculat al tema",
-      "objectius": ["Objectius d'aprenentatge"],
-      "desenvolupament": [{"nom": "Fase", "descripcio": "Logística"}]
+      "titol": "Títol definitiu",
+      "context": "Context de la proposta",
+      "objectius": ["Llista d'objectius per a l'alumne"],
+      "desenvolupament": [{"nom": "Pas", "descripcio": "Acció"}]
     }
   }`;
 
@@ -53,16 +69,16 @@ export async function analyzeAndImprove(content: string, phase: SAPhase, modelNa
 }
 
 export async function proposeProducts(improvedContent: any, instrumentName: string, grouping: string, phase: string, modelName: string) {
-  const prompt = `Basant-te en el contingut temàtic (Molt important ser coherent: si és ciència, no demanis enquestes genèriques), proposa 3 formats de producte final que l'alumnat hagi de lliurar.
-  Format de lliurament possibles: Informe de recerca, Vídeo demostratiu, Pòdcast científic, Infografia tècnica, Maqueta funcional, etc.
-  Han de ser coherents amb l'instrument: "${instrumentName}".
+  const prompt = `Proposa 3 productes finals coherents amb la matèria del contingut: ${JSON.stringify(improvedContent)}.
+  Instrument d'avaluació: "${instrumentName}".
+  Sigues molt específic: si el tema és científic, el producte ha de ser tècnic. NO proposis enquestes si no tenen sentit amb la matèria.
 
-  Torna un JSON amb:
+  Torna un JSON:
   {
     "proposals": [
-      { "id": "1", "titol": "Repte creatiu", "descripcio": "Què farà l'alumne?", "format": "Tipus de producte" },
-      { "id": "2", "titol": "Repte creatiu", "descripcio": "Què farà l'alumne?", "format": "Tipus de producte" },
-      { "id": "3", "titol": "Repte creatiu", "descripcio": "Què farà l'alumne?", "format": "Tipus de producte" }
+      { "id": "1", "titol": "Producte 1", "descripcio": "Detall operacional", "format": "Tipus de fitxer/suport" },
+      { "id": "2", "titol": "Producte 2", "descripcio": "Detall operacional", "format": "Tipus de fitxer/suport" },
+      { "id": "3", "titol": "Producte 3", "descripcio": "Detall operacional", "format": "Tipus de fitxer/suport" }
     ]
   }`;
 
@@ -84,18 +100,13 @@ export async function generateStudentGuide(
   instrumentName: string,
   modelName: string
 ) {
-  const prompt = `ESCRIU LA FITXA DE TREBALL PER A L'ALUMNAT.
-  Aquesta fitxa és la que el docent donarà a l'alumne. Ha de ser completa, clara i amb instruccions pas a pas.
+  const prompt = `ESCRIU LA FITXA DEFINITIVA PER A L'ALUMNE (Lectura fàcil i instruccions completes).
+  Logística: ${groupingType} ${groupingType === GroupingType.GRUP ? `en grups de ${memberCount}` : ''}.
+  Producte: ${selectedProduct.titol} (${selectedProduct.format}).
+  Instrument d'avaluació: ${instrumentName}.
+  Comentaris del docent a integrar: ${userComments}.
 
-  Logística: ${groupingType} ${groupingType === GroupingType.GRUP ? `(Equips de ${memberCount} persones)` : ''}.
-  Producte: ${selectedProduct.titol} (Format: ${selectedProduct.format}).
-
-  Estructura de la fitxa (TÍTOLS EN MAJÚSCULES I NEGRETA):
-  1. EL CONTEXT: On ens trobem? Quina és la situació?
-  2. INTRODUCCIÓ HISTÒRICA: Si és rellevant per al tema, afegeix context.
-  3. OBJECTIU DE LA FITXA: Què has d'aconseguir tu com a alumne/a?
-  4. PASSES PER DESENVOLUPAR LA FEINA: Guia detallada pas a pas de què cal fer, especificant el tipus d'agrupament (${groupingType}).
-  5. QUÈ HAS DE LLIURAR?: Detall del material final (${selectedProduct.format}) i com t'avaluarem amb "${instrumentName}".`;
+  Recorda: Adreça't a l'alumne directament. Instruccions pas a pas. Estructura amb: EL CONTEXT, INTRODUCCIÓ, OBJECTIU, DESENVOLUPAMENT PAS A PAS, i QUÈ HAS DE LLIURAR.`;
 
   const response = await ai.models.generateContent({
     model: modelName,
@@ -103,32 +114,32 @@ export async function generateStudentGuide(
     config: { systemInstruction: SYSTEM_PROMPT }
   });
 
-  return response.text || "Error en la generació.";
+  return response.text || "Error generant la fitxa.";
 }
 
 export async function generateSummary(content: string, modelName: string) {
-  const prompt = `Analitza curricularment aquesta fitxa d'alumne: ${content}.
-  IMPORTANT: Eixos Escola només poden ser 4: Feminisme, Sostenibilitat, Territori, ODS.
+  const prompt = `Fes el resum curricular de la fitxa: ${content}.
+  IMPORTANT: Recorda que els Eixos de l'Escola només poden ser: Feminisme, Sostenibilitat, Territori, ODS.
   
-  Torna un JSON amb:
+  Torna un JSON:
   {
-    "competencies": [{"code": "Codi", "definition": "Definició"}],
-    "sabers": ["..."],
+    "competencies": [{"code": "Codi", "definition": "Definició LOMLOE"}],
+    "sabers": ["Llista de sabers"],
     "eixosEscola": {
       "all": ["Feminisme", "Sostenibilitat", "Territori", "ODS"],
-      "highlighted": ["Màxim 2 de la llista anterior"]
+      "highlighted": ["Màxim 2 eixos clau de la fitxa"]
     },
     "ods": {
-      "all": ["Llista dels 17 ODS"],
-      "highlighted": ["Màxim 2 principals"]
+      "all": ["Llista ODS"],
+      "highlighted": ["Màxim 2 ODS"]
     },
     "competenciesABP": {
       "all": ["Pensament sistèmic", "Anticipació", "Valors i creences", "Estratègica", "Col·laboració", "Pensament crític", "Consciència d’un mateix", "Resolució de problemes integrada"],
-      "highlighted": ["La competència ABPxODS principal de l'activitat"]
+      "highlighted": ["LA competència ABPxODS que més destaca en aquesta activitat"]
     },
     "bloom": {
       "all": ["Recordar", "Comprendre", "Aplicar", "Analitzar", "Avaluar", "Crear"],
-      "highlighted": ["Nivells clau activats"]
+      "highlighted": ["Nivells cognitius clau"]
     }
   }`;
 
@@ -142,7 +153,7 @@ export async function generateSummary(content: string, modelName: string) {
 }
 
 export async function generateEvaluationFull(content: string, instrumentName: string, modelName: string) {
-  const prompt = `Crea l'instrument d'avaluació "${instrumentName}" detallat basat en aquesta fitxa d'alumne: ${content}. Ha de ser una guia clara per al docent i l'alumne.`;
+  const prompt = `Crea l'instrument "${instrumentName}" detallat basat en la fitxa d'alumne: ${content}. Ha de ser una guia clara d'autoavaluació per a l'estudiant.`;
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,
