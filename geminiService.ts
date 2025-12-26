@@ -4,18 +4,17 @@ import { SAPhase, SAPhaseLabels, GroupingType } from "./types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const SYSTEM_PROMPT = `Ets un expert en disseny instruccional i pedagogia (LOMLOE Catalunya), especialitzat en el projecte educatiu de l'Escola Nou Patufet.
+const SYSTEM_PROMPT = `Ets un expert en disseny instruccional i pedagogia (LOMLOE Catalunya) per a l'Escola Nou Patufet.
 
-EIXOS NOU PATUFET: Territori, Feminisme, Món sostenible (ODS), Llengua catalana, Amor/Benestar, Transformació.
-COMPETÈNCIES ABPxODS: Pensament sistèmic, Anticipació, Valors i creences, Estratègica, Col·laboració, Pensament crític, Consciència d’un mateix, Resolució de problemes integrada.
-TAXONOMIA DE BLOOM: Recordar, Comprendre, Aplicar, Analitzar, Avaluar, Crear.
-PAUTES DUA: Aplica sempre el Disseny Universal per a l'Aprenentatge per garantir la inclusió i l'accessibilitat.
+EL TEU ROL:
+- Ets fidel a la proposta que l'usuari (docent) penja o escriu. No inventis un tema nou, millora l'existent.
+- El core de la feina ja el dona el docent; la teva missió és estructurar-lo pedagògicament per a l'alumne.
+- Aplica les pautes DUA (accessibilitat i múltiples maneres de representació).
 
-IMPORTANT: 
-- L'instrument d'avaluació ha de ser coherent amb el producte que demanem a l'alumnat.
-- La fase de l'aprenentatge determina el tipus d'activitat.
-- L'agrupament és fonamental per a la logística de la fitxa.
-- El producte final (Vídeo, Podcast, Infografia, etc.) ha de ser avaluat per l'instrument triat.`;
+MARC DE REFERÈNCIA:
+- Eixos Nou Patufet: Territori, Feminisme, Món sostenible (ODS), Llengua catalana, Amor/Benestar, Transformació.
+- Competències ABPxODS: Pensament sistèmic, Anticipació, Valors i creences, Estratègica, Col·laboració, Pensament crític, Consciència d’un mateix, Resolució de problemes integrada.
+- Taxonomia de Bloom: Recordar, Comprendre, Aplicar, Analitzar, Avaluar, Crear.`;
 
 function robustJSONParse(text: string | undefined) {
   if (!text) throw new Error("La resposta està buida.");
@@ -29,18 +28,18 @@ function robustJSONParse(text: string | undefined) {
 }
 
 export async function analyzeAndImprove(content: string, phase: SAPhase, modelName: string, temperature: number) {
-  const prompt = `Analitza aquesta proposta educativa i presenta una "Proposta de Millora" basada en criteris pedagògics rigorosos i l'enfocament de l'Escola Nou Patufet.
+  const prompt = `Analitza la proposta del docent i suggereix millores pedagògiques sense perdre l'essència de la seva idea original.
+  Contingut docent: ${content}
   Fase SA: ${SAPhaseLabels[phase]}
-  Contingut: ${content}
 
   Torna un JSON amb:
   {
-    "improvementSuggestion": "Anàlisi detallada i justificació pedagògica de la millora amb rigor acadèmic.",
+    "improvementSuggestion": "Anàlisi de com millorar la proposta mantenint-se fidel al core del docent.",
     "improved": {
-      "titol": "Títol sugerit",
-      "context": "Context educatiu millorat",
-      "objectius": ["Llista d'objectius d'aprenentatge clars"],
-      "desenvolupament": [{"nom": "Fase", "descripcio": "Detall tècnic"}]
+      "titol": "Títol definitiu",
+      "context": "Context millorat",
+      "objectius": ["Llista d'objectius clars"],
+      "desenvolupament": [{"nom": "Fase", "descripcio": "Passos tècnics"}]
     }
   }`;
 
@@ -58,15 +57,15 @@ export async function analyzeAndImprove(content: string, phase: SAPhase, modelNa
 }
 
 export async function proposeProducts(improvedContent: any, instrumentName: string, grouping: string, phase: string, modelName: string) {
-  const prompt = `Basant-te en la proposta millorada, l'instrument d'avaluació "${instrumentName}", l'agrupament "${grouping}" i la fase "${phase}", proposa 3 opcions de lliurament que els alumnes hagin de crear.
-  Cada opció ha de ser un producte tangible (Ex: Informe escrit, Vídeo, Pòdcast, Infografia, Maqueta digital, etc.).
-  
+  const prompt = `Basant-te en la proposta del docent, tria 3 formats de lliurament (productes) que l'alumne pugui crear i que siguin coherents amb l'instrument d'avaluació "${instrumentName}".
+  Exemples de formats: Informe escrit, Vídeo, Pòdcast, Infografia, Presentació digital, Maqueta, etc.
+
   Torna un JSON amb:
   {
     "proposals": [
-      { "id": "1", "titol": "Nom del repte", "descripcio": "Breu descripció", "format": "Ex: Vídeo" },
-      { "id": "2", "titol": "Nom del repte", "descripcio": "Breu descripció", "format": "Ex: Pòdcast" },
-      { "id": "3", "titol": "Nom del repte", "descripcio": "Breu descripció", "format": "Ex: Infografia" }
+      { "id": "1", "titol": "Nom de la tasca", "descripcio": "Què faran exactament", "format": "Ex: Vídeo" },
+      { "id": "2", "titol": "Nom de la tasca", "descripcio": "Què faran exactament", "format": "Ex: Pòdcast" },
+      { "id": "3", "titol": "Nom de la tasca", "descripcio": "Què faran exactament", "format": "Ex: Informe escrit" }
     ]
   }`;
 
@@ -88,21 +87,19 @@ export async function generateStudentGuide(
   instrumentName: string,
   modelName: string
 ) {
-  const prompt = `CREA LA FITXA PER A L'ALUMNAT (Guia de Treball en format text).
+  const prompt = `Escriu la FITXA DE L'ALUMNE definitiva en format text. Ha de ser clara, motivadora i operacional.
   
-  Configuració:
-  - Contingut Base: ${JSON.stringify(improvedContent)}
-  - Producte a realitzar: ${selectedProduct.titol} (Format: ${selectedProduct.format})
+  Dades:
+  - Producte: ${selectedProduct.titol} (Format: ${selectedProduct.format})
   - Organització: ${groupingType} ${groupingType === GroupingType.GRUP ? `(Equips de ${memberCount})` : ''}
   - Instrument d'Avaluació: ${instrumentName}
-  - Observacions: ${userComments}
 
-  Estructura OBLIGATÒRIA de la fitxa (escrita directament per a l'alumne):
-  1. El Context: Situació o escenari real o previsible.
-  2. Introducció històrica: Si s’escau, afegeix context històric motivador.
-  3. L'Objectiu de la fitxa: Què s'espera aconseguir?
-  4. Desenvolupament pas a pas: Instruccions precises de què ha de fer l'alumnat, especificant clarament la dinàmica (${groupingType}).
-  5. Material a lliurar: Descripció detallada del format ${selectedProduct.format} que hauran de presentar i com serà avaluat amb ${instrumentName}.`;
+  L'estructura de la fitxa ha de ser exactament aquesta:
+  1. El Context: Descriu la situació o escenari.
+  2. Introducció històrica: Si escau per al tema, afegeix un relat motivador.
+  3. L'Objectiu de la fitxa: Què aprendrà i què aconseguirà l'alumne?
+  4. El desenvolupament pas a pas: Instruccions precises per a l'alumne, especificant clarament la dinàmica (${groupingType}) i guiant cada fase de la creació.
+  5. El material que has de lliurar: Descripció del lliurable final en format ${selectedProduct.format} i recordatori que s'avaluarà mitjançant "${instrumentName}".`;
 
   const response = await ai.models.generateContent({
     model: modelName,
@@ -110,48 +107,45 @@ export async function generateStudentGuide(
     config: { systemInstruction: SYSTEM_PROMPT }
   });
 
-  return response.text || "Error generant la guia.";
+  return response.text || "Error generant la fitxa.";
 }
 
 export async function generateSummary(content: string, modelName: string) {
-  const prompt = `Analitza el vincle curricular de la següent fitxa d'alumne: ${content}.
+  const prompt = `Genera el resum curricular final d'aquesta fitxa: ${content}.
   
-  Torna un JSON amb aquesta estructura:
+  Torna un JSON amb:
   {
-    "competencies": [{"code": "Codi LOMLOE", "definition": "Definició"}],
+    "competencies": [{"code": "Codi", "definition": "Definició"}],
     "sabers": ["..."],
     "eixosEscola": {
       "all": ["Territori", "Feminisme", "Món sostenible", "ODS", "Llengua catalana", "Amor/Benestar", "Transformació"],
-      "highlighted": ["Màxim 2 principals"]
+      "highlighted": ["Els 2 eixos clau de la fitxa"]
     },
     "ods": {
-      "all": ["Llista dels 17 ODS"],
-      "highlighted": ["Màxim 2 principals"]
+      "all": ["Llista simplificada dels 17 ODS"],
+      "highlighted": ["Els 2 ODS principals"]
     },
     "competenciesABP": {
       "all": ["Pensament sistèmic", "Anticipació", "Valors i creences", "Estratègica", "Col·laboració", "Pensament crític", "Consciència d’un mateix", "Resolució de problemes integrada"],
-      "highlighted": ["Màxim 2 principals"]
+      "highlighted": ["Les 2 principals de la fitxa"]
     },
     "bloom": {
       "all": ["Recordar", "Comprendre", "Aplicar", "Analitzar", "Avaluar", "Crear"],
-      "highlighted": ["Llista els nivells que s'activen en aquesta fitxa"]
+      "highlighted": ["Llista els nivells de la taxonomia que s'activen"]
     }
   }`;
 
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,
-    config: {
-      systemInstruction: SYSTEM_PROMPT,
-      responseMimeType: "application/json"
-    }
+    config: { systemInstruction: SYSTEM_PROMPT, responseMimeType: "application/json" }
   });
 
   return robustJSONParse(response.text);
 }
 
 export async function generateEvaluationFull(content: string, instrumentName: string, modelName: string) {
-  const prompt = `Genera l'instrument d'avaluació "${instrumentName}" basat en la següent fitxa: ${content}`;
+  const prompt = `Genera un esborrany complet de l'instrument d'avaluació "${instrumentName}" adaptat a la fitxa de l'alumne: ${content}`;
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,

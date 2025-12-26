@@ -70,18 +70,18 @@ export enum AppStep {
 }
 
 export const EVALUATION_INSTRUMENTS = [
-  { name: 'Qüestionaris', desc: 'Són instruments d’autoregulació i motivació que serveixen perquè l’estudiant reflexioni sobre què sap i què cal saber.' },
-  { name: 'Imatges, fotografies, vídeos', desc: 'Permet concentrar idees i recollir pensaments-clau. Es pot realitzar de manera individual o grupal.' },
-  { name: 'Organitzadors gràfics', desc: 'Bases d’orientació o Diagrames de fluix per anticipar i planificar les accions de la tasca.' },
-  { name: 'Mapes i esquemes', desc: 'Mapes conceptuals, de pensament o mentals per representar visualment la relació entre conceptes.' },
-  { name: 'Línies de temps', desc: 'Eina per ordenar una seqüència de fets visualitzant la seva relació temporal.' },
-  { name: 'Diagrames (V de Gowin)', desc: 'Eina per establir relacions entre aspectes conceptuals i metodològics.' },
-  { name: 'Dianes d’avaluació', desc: 'Instrument visual per determinar el nivell d’assoliment en diferents dimensions.' },
-  { name: 'KPSI', desc: 'Knowledge and Prior Study Inventory: qüestionari per recollir el punt de partida i l’evolució.' },
-  { name: 'Rúbriques', desc: 'Eina per mostrar clarament les expectatives i guiar l’autoavaluació.' },
-  { name: 'Entrevistes / Converses', desc: 'Tècnica per conèixer les preferències i motivacions i fer un feedback efectiu durant el procés.' },
-  { name: 'Observació d’aula', desc: 'Graelles sistemàtiques de control d’actuacions o comportaments observables.' },
-  { name: 'Proves de coneixements', desc: 'Proves competencials per conèixer el nivell d’assoliment dels sabers bàsics.' }
+  { name: 'Qüestionaris', desc: 'Instruments d’autoregulació i motivació per reflexionar sobre el que se sap i el que cal saber.' },
+  { name: 'Imatges, fotografies, vídeos', desc: 'Recollida de pensaments-clau a partir de suports visuals o audiovisuals.' },
+  { name: 'Organitzadors gràfics', desc: 'Bases d’orientació o Diagrames de fluix per planificar les accions de la tasca.' },
+  { name: 'Mapes i esquemes', desc: 'Mapes conceptuals, mentals o de pensament (Visual Thinking) per representar relacions.' },
+  { name: 'Línies de temps', desc: 'Ordenació de seqüències de fets per visualitzar la relació temporal.' },
+  { name: 'Diagrames (V de Gowin)', desc: 'Eina per interrelacionar idees teòriques amb els procediments emprats.' },
+  { name: 'Dianes d’avaluació', desc: 'Instrument visual per determinar el nivell d’assoliment en diverses dimensions.' },
+  { name: 'KPSI', desc: 'Qüestionari inicial i final per autoregular l’aprenentatge comparant el progrés.' },
+  { name: 'Rúbriques', desc: 'Taules que expliciten les expectatives i guien l’autoreflexió de l’alumne.' },
+  { name: 'Entrevistes / Converses', desc: 'Feedback efectiu durant el procés per conèixer preferències i motivacions.' },
+  { name: 'Observació d’aula', desc: 'Graelles de control de comportaments observables i criteris d’assoliment.' },
+  { name: 'Proves de coneixements', desc: 'Proves competencials per valorar l’assoliment dels sabers del currículum.' }
 ];
 
 export const BLOOM_LEVELS = [
