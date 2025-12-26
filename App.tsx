@@ -1,12 +1,19 @@
 
 import React, { useState, useRef } from 'react';
-import { SAPhase, AppStep, PedagogicalAnalysis, SAPhaseLabels, EVALUATION_INSTRUMENTS, GroupingType, SummaryData, ProductProposal } from './types';
+import { SAPhase, AppStep, PedagogicalAnalysis, SAPhaseLabels, EVALUATION_INSTRUMENTS, GroupingType, SummaryData, ProductProposal, BLOOM_LEVELS } from './types';
 import * as geminiService from './geminiService';
+// @ts-ignore
+import * as mammoth from 'mammoth';
+// @ts-ignore
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configura el worker de PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@^4.0.379/build/pdf.worker.min.mjs`;
 
 const Header: React.FC = () => (
   <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
     <div className="flex items-center gap-3">
-      <div className="bg-indigo-600 p-2 rounded-xl text-white font-bold text-xl shadow-sm">NP</div>
+      <div className="bg-indigo-600 p-2 rounded-xl text-white font-black text-xl shadow-sm">NP</div>
       <div>
         <h1 className="text-lg font-black text-slate-800 leading-tight">Disseny Instruccional</h1>
         <p className="text-[9px] text-slate-500 font-bold tracking-[0.2em] uppercase">Escola Nou Patufet</p>
@@ -62,13 +69,49 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    
+    if (extension === 'docx') {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value;
+    } 
+    
+    if (extension === 'pdf') {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        fullText += pageText + "\n";
+      }
+      return fullText;
+    }
+    
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.readAsText(file);
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => setFileContent(e.target?.result as string);
-      reader.readAsText(file);
+      setLoading(true);
+      setError(null);
+      try {
+        setSelectedFile(file);
+        const text = await extractTextFromFile(file);
+        setFileContent(text);
+      } catch (err) {
+        setError("No s'ha pogut llegir el fitxer. Comprova el format.");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -80,7 +123,7 @@ const App: React.FC = () => {
 
   const handleStartAnalysis = async () => {
     if (!fileContent.trim()) {
-      setError("Cal introduir algun contingut bàsic de la proposta.");
+      setError("Cal introduir algun contingut o adjuntar un fitxer.");
       return;
     }
     setLoading(true);
@@ -98,7 +141,7 @@ const App: React.FC = () => {
       });
       setCurrentStep(AppStep.ANALYSIS);
     } catch (err: any) {
-      setError(err.message || "Error en l'anàlisi inicial.");
+      setError(err.message || "Error en l'anàlisi.");
     } finally {
       setLoading(false);
     }
@@ -121,7 +164,7 @@ const App: React.FC = () => {
       setAnalysis({ ...analysis, productProposals: result.proposals, selectedInstrumentName: selectedInstrument });
       setCurrentStep(AppStep.PRODUCT_SELECTION);
     } catch (err) {
-      setError("Error generant propostes de lliurament.");
+      setError("Error generant propostes.");
     } finally {
       setLoading(false);
     }
@@ -155,7 +198,7 @@ const App: React.FC = () => {
       });
       setCurrentStep(AppStep.STUDENT_GUIDE);
     } catch (err) {
-      setError("Error generant la fitxa operativa final.");
+      setError("Error generant la fitxa definitiva.");
     } finally {
       setLoading(false);
     }
@@ -165,7 +208,7 @@ const App: React.FC = () => {
     <div className="bg-white rounded-[40px] shadow-sm border border-slate-200 p-10 space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center space-y-2">
         <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">Proposta Educativa</h2>
-        <p className="text-slate-500 font-medium">Defineix l'essència de la teva Situació d'Aprenentatge</p>
+        <p className="text-slate-500 font-medium italic">Adjunta la teva programació o descripció base</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
@@ -174,15 +217,15 @@ const App: React.FC = () => {
             <label className="text-xs font-black text-indigo-600 uppercase tracking-widest block mb-1">Contingut de la SA</label>
             <div className="relative group">
               <textarea 
-                className="w-full h-80 p-8 text-sm bg-slate-50 border-4 border-slate-100 rounded-[35px] focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-inner font-medium text-slate-700"
+                className="w-full h-80 p-8 text-sm bg-slate-50 border-4 border-slate-100 rounded-[35px] focus:border-indigo-500 focus:bg-white outline-none transition-all shadow-inner font-medium text-slate-700 custom-scrollbar"
                 value={fileContent} 
                 onChange={e => setFileContent(e.target.value)} 
-                placeholder="Explica la teva idea, unitat o activitat inicial..." 
+                placeholder="Pots enganxar text aquí o adjuntar un document (PDF, WORD)..." 
               />
               <div className="absolute bottom-6 right-6 flex gap-3">
                  {!selectedFile ? (
                    <button onClick={() => fileInputRef.current?.click()} className="bg-indigo-600 px-6 py-3 rounded-2xl text-white hover:bg-indigo-700 transition-all shadow-lg flex items-center gap-3 text-xs font-black uppercase tracking-widest">
-                    <span>Adjuntar Arxiu</span>
+                    <span>📁 Adjuntar PDF / WORD</span>
                    </button>
                  ) : (
                    <div className="flex gap-2">
@@ -195,7 +238,7 @@ const App: React.FC = () => {
                    </div>
                  )}
               </div>
-              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept=".pdf,.doc,.docx,.md,.txt" />
+              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept=".pdf,.doc,.docx,.txt" />
             </div>
           </section>
         </div>
@@ -205,12 +248,12 @@ const App: React.FC = () => {
              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Configuració IA</h4>
              <div className="space-y-4">
                 <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-[10px] font-black uppercase text-slate-700">
-                    <option value="gemini-3-flash-preview">⚡ Flash</option>
-                    <option value="gemini-3-pro-preview">💎 Pro</option>
+                    <option value="gemini-3-flash-preview">⚡ Flash (Ràpid)</option>
+                    <option value="gemini-3-pro-preview">💎 Pro (Intel·ligent)</option>
                 </select>
                 <div className="space-y-2">
-                   <div className="flex justify-between text-[9px] font-black text-slate-400">
-                     <span>SOBRI</span><span>CREATIU</span>
+                   <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase">
+                     <span>Sobri</span><span>Creatiu</span>
                    </div>
                    <input type="range" min="0" max="1" step="0.1" value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} className="w-full accent-indigo-600" />
                 </div>
@@ -231,7 +274,7 @@ const App: React.FC = () => {
       </div>
 
       <button disabled={loading} onClick={handleStartAnalysis} className="w-full py-8 bg-indigo-600 text-white rounded-[35px] font-black text-2xl shadow-2xl hover:bg-indigo-700 transform active:scale-95 transition-all">
-        {loading ? 'PROCESSANT...' : 'GENERAR MILLORA I CONFIGURAR 🚀'}
+        {loading ? 'LLEGINT I ANALITZANT...' : 'CONTINUAR A LA MILLORA 🚀'}
       </button>
     </div>
   );
@@ -265,13 +308,13 @@ const App: React.FC = () => {
             </div>
 
             <div className="space-y-6">
-              <label className="text-xs font-black text-indigo-600 uppercase tracking-widest block border-b-4 border-indigo-50 pb-3">Observacions Docents</label>
-              <textarea value={userComments} onChange={e => setUserComments(e.target.value)} placeholder="Matisos personals..." className="w-full h-40 p-6 text-sm bg-slate-50 border-4 border-slate-50 rounded-[35px] outline-none shadow-inner" />
+              <label className="text-xs font-black text-indigo-600 uppercase tracking-widest block border-b-4 border-indigo-50 pb-3">Observacions del Docent</label>
+              <textarea value={userComments} onChange={e => setUserComments(e.target.value)} placeholder="Matisos personals, context de l'escola..." className="w-full h-40 p-6 text-sm bg-slate-50 border-4 border-slate-50 rounded-[35px] outline-none shadow-inner custom-scrollbar" />
             </div>
           </section>
 
           <section className="space-y-8">
-             <label className="text-xs font-black text-indigo-600 uppercase tracking-widest block border-b-4 border-indigo-50 pb-3">Instrument d'Avaluació (Decisiu)</label>
+             <label className="text-xs font-black text-indigo-600 uppercase tracking-widest block border-b-4 border-indigo-50 pb-3">Instrument d'Avaluació Nou Patufet</label>
              <div className="grid grid-cols-1 gap-2 max-h-[450px] overflow-y-auto pr-4 custom-scrollbar">
                 {EVALUATION_INSTRUMENTS.map((inst, i) => (
                   <button key={i} onClick={() => setSelectedInstrument(inst.name)} className={`p-4 text-left border-4 rounded-2xl transition-all ${selectedInstrument === inst.name ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white border-slate-50 hover:border-indigo-200'}`}>
@@ -288,7 +331,7 @@ const App: React.FC = () => {
           onClick={handleGenerateProposals} 
           className="w-full py-8 bg-indigo-600 text-white rounded-[40px] font-black text-2xl shadow-2xl hover:bg-indigo-700 disabled:opacity-30 transform active:scale-95 transition-all"
         >
-          {loading ? 'GENERANT PROPOSTES...' : 'VEURE PROPOSTES DE LLIURAMENT 🎯'}
+          {loading ? 'DISSENYANT PROPOSTES...' : 'VEURE PROPOSTES DE LLIURAMENT 🎯'}
         </button>
       </div>
     </div>
@@ -297,8 +340,8 @@ const App: React.FC = () => {
   const renderProductSelection = () => (
     <div className="space-y-12 animate-in fade-in zoom-in-95 duration-500 pb-20">
       <div className="text-center space-y-4">
-        <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">Propostes de Producte Final</h2>
-        <p className="text-slate-500 font-medium italic">Tria quina d'aquestes opcions s'ajusta millor a l'instrument: <strong>{selectedInstrument}</strong></p>
+        <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">Tria el Producte Final</h2>
+        <p className="text-slate-500 font-medium italic uppercase tracking-widest text-[11px]">Quin format s'adapta millor a l'instrument: {selectedInstrument}?</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -308,8 +351,11 @@ const App: React.FC = () => {
             onClick={() => handleSelectProduct(product)}
             className="p-10 bg-white rounded-[50px] border-8 border-slate-50 hover:border-indigo-500 hover:shadow-2xl transition-all text-left space-y-6 group transform hover:-translate-y-2"
           >
-            <div className="h-16 w-16 bg-indigo-50 rounded-3xl flex items-center justify-center text-3xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">✨</div>
+            <div className="h-16 w-16 bg-indigo-50 rounded-3xl flex items-center justify-center text-3xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+               {product.format.includes('Vídeo') ? '🎥' : product.format.includes('Pòdcast') ? '🎙️' : '📄'}
+            </div>
             <h4 className="text-xl font-black text-slate-800 uppercase leading-tight">{product.titol}</h4>
+            <p className="text-[11px] font-black text-indigo-600 uppercase tracking-widest">{product.format}</p>
             <p className="text-sm text-slate-500 font-medium leading-relaxed">{product.descripcio}</p>
             <div className="pt-4 text-xs font-black text-indigo-600 uppercase tracking-widest group-hover:translate-x-2 transition-transform">Triar aquest →</div>
           </button>
@@ -322,22 +368,29 @@ const App: React.FC = () => {
     <div className="space-y-12 animate-in fade-in zoom-in-95 duration-500 pb-40">
       <div className="bg-amber-400 text-amber-950 p-12 rounded-[50px] shadow-2xl border-b-[12px] border-amber-600 flex items-center justify-between">
         <div className="flex items-center gap-10">
-          <span className="text-7xl">📋</span>
+          <span className="text-7xl drop-shadow-xl">📋</span>
           <div>
-            <h3 className="text-xs font-black uppercase tracking-[0.4em] opacity-60 mb-2">Guia de Treball de l'Alumne</h3>
+            <h3 className="text-xs font-black uppercase tracking-[0.4em] opacity-60 mb-2">Guia de Treball per a l'Alumnat</h3>
             <p className="font-black text-4xl uppercase tracking-tighter leading-none">{analysis?.selectedProduct?.titol}</p>
+            <div className="mt-4 flex gap-2">
+                <span className="bg-amber-300 px-3 py-1 rounded-full text-[9px] font-black uppercase">Format: {analysis?.selectedProduct?.format}</span>
+                <span className="bg-amber-300 px-3 py-1 rounded-full text-[9px] font-black uppercase">Agrupament: {analysis?.groupingType}</span>
+            </div>
           </div>
         </div>
       </div>
       
-      <div className="bg-white rounded-[60px] shadow-2xl border-4 border-slate-50 p-16 prose prose-indigo max-w-none prose-headings:font-black prose-p:text-slate-700 prose-p:text-lg">
-        <div className="whitespace-pre-wrap leading-relaxed font-medium">
+      <div className="bg-white rounded-[60px] shadow-2xl border-4 border-slate-50 p-16 prose prose-indigo max-w-none">
+        <div className="whitespace-pre-wrap leading-relaxed font-medium text-slate-700 text-lg">
           {analysis?.studentGuide}
         </div>
       </div>
 
       <div className="bg-indigo-600 p-12 rounded-[60px] shadow-2xl border-b-[12px] border-indigo-800">
-        <h3 className="text-3xl font-black text-white mb-6">📝 Instrument d'Avaluació: {analysis?.selectedInstrumentName}</h3>
+        <h3 className="text-3xl font-black text-white mb-6 flex items-center gap-4">
+           <span>📝</span>
+           <span>Instrument d'Avaluació: {analysis?.selectedInstrumentName}</span>
+        </h3>
         <div className="whitespace-pre-wrap text-lg text-white font-bold opacity-90 italic bg-indigo-500/30 p-8 rounded-3xl border-2 border-indigo-400/50">
           {analysis?.evaluationInstrument}
         </div>
@@ -353,35 +406,35 @@ const App: React.FC = () => {
   const renderSummary = () => (
     <div className="space-y-12 pb-40 animate-in fade-in duration-700">
       <div className="text-center space-y-4">
-        <h2 className="text-5xl font-black text-slate-800 uppercase tracking-tighter">Resum Pedagògic Final</h2>
-        <p className="text-slate-400 font-black uppercase tracking-[0.5em] text-xs">LOMLOE • Escola Nou Patufet</p>
+        <h2 className="text-5xl font-black text-slate-800 uppercase tracking-tighter">Resum Pedagògic</h2>
+        <p className="text-slate-400 font-black uppercase tracking-[0.5em] text-xs">LOMLOE • Nou Patufet • Catesco • Bloom</p>
       </div>
 
-      <div className="bg-white rounded-[60px] shadow-2xl border-[6px] border-slate-50 overflow-hidden">
+      <div className="bg-white rounded-[60px] shadow-2xl border-[6px] border-slate-50 overflow-hidden overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-slate-900 text-white">
               <th className="px-12 py-8 text-left text-xs font-black uppercase tracking-widest w-1/4">Àmbit</th>
-              <th className="px-12 py-8 text-left text-xs font-black uppercase tracking-widest">Detalls</th>
+              <th className="px-12 py-8 text-left text-xs font-black uppercase tracking-widest">Detalls Pedagògics</th>
             </tr>
           </thead>
           <tbody className="divide-y-4 divide-slate-50">
-            {/* Competències Específiques */}
-            <tr>
-              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase tracking-widest border-r-4 border-slate-50">Competències</td>
+            {/* Competències */}
+            <tr className="hover:bg-slate-50/50 transition-colors">
+              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase border-r-4 border-slate-50">Competències Específiques</td>
               <td className="px-12 py-10 space-y-4">
                 {analysis?.summaryTable?.competencies.map((c, idx) => (
-                  <div key={idx} className="bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-100">
-                    <span className="text-[10px] font-black text-indigo-600 uppercase">{c.code}</span>
-                    <p className="text-slate-700 font-bold text-sm">{c.definition}</p>
+                  <div key={idx} className="bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-100 shadow-sm">
+                    <span className="text-[10px] font-black text-indigo-600 uppercase bg-white px-2 py-1 rounded-md mb-2 inline-block">{c.code}</span>
+                    <p className="text-slate-700 font-bold text-sm leading-snug">{c.definition}</p>
                   </div>
                 ))}
               </td>
             </tr>
 
-            {/* Sabers Bàsics */}
+            {/* Sabers */}
             <tr>
-              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase tracking-widest border-r-4 border-slate-50">Sabers</td>
+              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase border-r-4 border-slate-50">Sabers Bàsics</td>
               <td className="px-12 py-10">
                 <div className="flex flex-wrap gap-2">
                   {analysis?.summaryTable?.sabers.map((s, idx) => (
@@ -391,15 +444,32 @@ const App: React.FC = () => {
               </td>
             </tr>
 
+            {/* Bloom Levels */}
+            <tr>
+              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase border-r-4 border-slate-50">Taxonomia de Bloom</td>
+              <td className="px-12 py-10">
+                <div className="flex flex-wrap gap-4">
+                  {analysis?.summaryTable?.bloom.all.map((level, idx) => {
+                    const isHighlighted = analysis?.summaryTable?.bloom.highlighted.includes(level);
+                    return (
+                      <span key={idx} className={`px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest border-4 transition-all ${isHighlighted ? 'bg-amber-600 text-white border-amber-500 shadow-xl scale-110' : 'bg-slate-100 text-slate-300 border-slate-200 opacity-40'}`}>
+                        {level}
+                      </span>
+                    );
+                  })}
+                </div>
+              </td>
+            </tr>
+
             {/* Eixos Escola */}
             <tr>
-              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase tracking-widest border-r-4 border-slate-50">Eixos Escola (Destacats)</td>
+              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase border-r-4 border-slate-50">Eixos Escola (Destacats)</td>
               <td className="px-12 py-10">
                 <div className="flex flex-wrap gap-4">
                   {analysis?.summaryTable?.eixosEscola.all.map((e, idx) => {
                     const isHighlighted = analysis?.summaryTable?.eixosEscola.highlighted.includes(e);
                     return (
-                      <span key={idx} className={`px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest border-4 transition-all ${isHighlighted ? 'bg-emerald-600 text-white border-emerald-500 shadow-xl' : 'bg-slate-100 text-slate-300 border-slate-200 opacity-40'}`}>
+                      <span key={idx} className={`px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest border-4 transition-all ${isHighlighted ? 'bg-emerald-600 text-white border-emerald-500 shadow-xl scale-110' : 'bg-slate-100 text-slate-300 border-slate-200 opacity-40'}`}>
                         {e}
                       </span>
                     );
@@ -410,13 +480,13 @@ const App: React.FC = () => {
 
             {/* ODS */}
             <tr>
-              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase tracking-widest border-r-4 border-slate-50">ODS (Destacats)</td>
+              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase border-r-4 border-slate-50">ODS (Destacats)</td>
               <td className="px-12 py-10">
                 <div className="grid grid-cols-6 gap-2">
                   {analysis?.summaryTable?.ods.all.map((o, idx) => {
                     const isHighlighted = analysis?.summaryTable?.ods.highlighted.some(h => o.includes(h) || h.includes(o));
                     return (
-                      <div key={idx} className={`p-2 rounded-xl text-[7px] font-black text-center border-2 ${isHighlighted ? 'bg-amber-500 text-white border-amber-600 shadow-xl scale-110' : 'bg-white text-slate-200 border-slate-100 opacity-30 grayscale'}`}>
+                      <div key={idx} className={`p-2 rounded-xl text-[7px] font-black text-center border-2 leading-tight ${isHighlighted ? 'bg-indigo-500 text-white border-indigo-600 shadow-xl scale-110' : 'bg-white text-slate-200 border-slate-100 opacity-30 grayscale'}`}>
                         {o}
                       </div>
                     );
@@ -427,7 +497,7 @@ const App: React.FC = () => {
 
             {/* Competències ABP */}
             <tr>
-              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase tracking-widest border-r-4 border-slate-50">ABP (Destacats)</td>
+              <td className="px-12 py-10 bg-slate-50 font-black text-xs text-slate-400 uppercase border-r-4 border-slate-50">ABP (Destacats)</td>
               <td className="px-12 py-10">
                 <div className="flex flex-wrap gap-2">
                   {analysis?.summaryTable?.competenciesABP.all.map((c, idx) => {
@@ -463,10 +533,11 @@ const App: React.FC = () => {
             <div className="bg-white p-16 rounded-[60px] shadow-2xl text-center space-y-8 max-w-md animate-in zoom-in-90 border-[12px] border-indigo-100">
               <div className="w-24 h-24 border-[12px] border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
               <p className="text-indigo-600 font-black uppercase tracking-[0.3em] text-lg">Processant el Disseny...</p>
+              <p className="text-slate-400 text-xs font-bold leading-relaxed px-4 italic">Llegint fitxers, analitzant currículum i DUA...</p>
             </div>
           </div>
         )}
-        {error && <div className="bg-rose-50 text-rose-600 p-10 rounded-[40px] text-xs font-black mb-12 border-4 border-rose-100 text-center shadow-xl">{error}</div>}
+        {error && <div className="bg-rose-50 text-rose-600 p-10 rounded-[40px] text-xs font-black mb-12 border-4 border-rose-100 text-center shadow-xl uppercase tracking-widest">{error}</div>}
         
         {currentStep === AppStep.UPLOAD && renderUpload()}
         {currentStep === AppStep.ANALYSIS && renderAnalysis()}
@@ -477,11 +548,11 @@ const App: React.FC = () => {
 
       {analysis?.studentGuide && (currentStep === AppStep.STUDENT_GUIDE) && (
         <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-3xl border-t-4 border-slate-100 p-10 shadow-2xl z-40 flex justify-center gap-8 animate-in slide-in-from-bottom">
-          <button onClick={() => navigator.clipboard.writeText(analysis.studentGuide)} className="px-12 py-5 bg-slate-900 text-white rounded-[25px] text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-2xl">
-            📋 Copiar Fitxa
+          <button onClick={() => navigator.clipboard.writeText(analysis.studentGuide)} className="px-12 py-5 bg-slate-900 text-white rounded-[25px] text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-2xl flex items-center gap-4">
+            <span>📋 Copiar Fitxa</span>
           </button>
-          <button className="px-12 py-5 bg-indigo-600 text-white rounded-[25px] text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-2xl">
-            📥 Descarregar Fitxa
+          <button className="px-12 py-5 bg-indigo-600 text-white rounded-[25px] text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-2xl flex items-center gap-4">
+            <span>📥 Descarregar en PDF</span>
           </button>
         </div>
       )}

@@ -22,6 +22,7 @@ export interface ProductProposal {
   id: string;
   titol: string;
   descripcio: string;
+  format: string; // Ex: Informe escrit, Vídeo, Pòdcast, Infografia...
 }
 
 export interface ActivityPhase {
@@ -42,6 +43,7 @@ export interface SummaryData {
   eixosEscola: { all: string[]; highlighted: string[] };
   ods: { all: string[]; highlighted: string[] };
   competenciesABP: { all: string[]; highlighted: string[] };
+  bloom: { all: string[]; highlighted: string[] };
 }
 
 export interface PedagogicalAnalysis {
@@ -68,20 +70,20 @@ export enum AppStep {
 }
 
 export const EVALUATION_INSTRUMENTS = [
-  { name: 'Bases d’orientació', desc: 'Guies estructurades que presenten els passos o aspectes clau per realitzar una tasca.' },
-  { name: 'Coavaluació', desc: 'Procés on els estudiants avaluen el treball dels seus companys.' },
-  { name: 'KPSI', desc: 'Qüestionaris inicials per identificar coneixements previs.' },
-  { name: 'Rúbriques', desc: 'Taules que descriuen nivells de qualitat en l’assoliment de competències.' },
-  { name: 'Autoavaluació', desc: 'Eina perquè l’alumnat reflexioni sobre el seu propi procés.' },
-  { name: 'Contracte d’avaluació', desc: 'Acord entre docent i alumne sobre objectius i compromisos.' },
-  { name: 'Diari d’equip', desc: 'Registre col·laboratiu on els membres d’un grup documenten el progres.' },
-  { name: 'Mapa conceptual', desc: 'Representació gràfica que mostra la relació entre conceptes.' },
-  { name: 'Diana d’avaluació', desc: 'Eina visual que representa el grau d’assoliment en forma de gràfic circular.' },
-  { name: 'Organitzadors gràfics', desc: 'Estructures visuals que ajuden a organitzar informació.' },
-  { name: 'Tickets d’entrada, mig i sortida', desc: 'Preguntes breus per recollir informació ràpida.' },
-  { name: 'Escala de metacognició', desc: 'Instrument per valorar la capacitat de planificar i avaluar el propi aprenentatge.' },
-  { name: 'Observació d’aula', desc: 'Recollida sistemàtica de dades sobre comportaments i interaccions.' },
-  { name: 'Feedback entre iguals', desc: 'Retroalimentació constructiva entre companys.' },
-  { name: 'Diaris d’aprenentatge', desc: 'Registres personals de reflexió sobre el procés.' },
-  { name: 'Portafolis digitals', desc: 'Recull organitzat d’evidències del treball de l’alumnat.' }
+  { name: 'Qüestionaris', desc: 'Són instruments d’autoregulació i motivació que serveixen perquè l’estudiant reflexioni sobre què sap i què cal saber.' },
+  { name: 'Imatges, fotografies, vídeos', desc: 'Permet concentrar idees i recollir pensaments-clau. Es pot realitzar de manera individual o grupal.' },
+  { name: 'Organitzadors gràfics', desc: 'Bases d’orientació o Diagrames de fluix per anticipar i planificar les accions de la tasca.' },
+  { name: 'Mapes i esquemes', desc: 'Mapes conceptuals, de pensament o mentals per representar visualment la relació entre conceptes.' },
+  { name: 'Línies de temps', desc: 'Eina per ordenar una seqüència de fets visualitzant la seva relació temporal.' },
+  { name: 'Diagrames (V de Gowin)', desc: 'Eina per establir relacions entre aspectes conceptuals i metodològics.' },
+  { name: 'Dianes d’avaluació', desc: 'Instrument visual per determinar el nivell d’assoliment en diferents dimensions.' },
+  { name: 'KPSI', desc: 'Knowledge and Prior Study Inventory: qüestionari per recollir el punt de partida i l’evolució.' },
+  { name: 'Rúbriques', desc: 'Eina per mostrar clarament les expectatives i guiar l’autoavaluació.' },
+  { name: 'Entrevistes / Converses', desc: 'Tècnica per conèixer les preferències i motivacions i fer un feedback efectiu durant el procés.' },
+  { name: 'Observació d’aula', desc: 'Graelles sistemàtiques de control d’actuacions o comportaments observables.' },
+  { name: 'Proves de coneixements', desc: 'Proves competencials per conèixer el nivell d’assoliment dels sabers bàsics.' }
+];
+
+export const BLOOM_LEVELS = [
+  'Recordar', 'Comprendre', 'Aplicar', 'Analitzar', 'Avaluar', 'Crear'
 ];
