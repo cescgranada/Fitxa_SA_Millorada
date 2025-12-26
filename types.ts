@@ -22,7 +22,7 @@ export interface ProductProposal {
   id: string;
   titol: string;
   descripcio: string;
-  format: string; // Ex: Informe escrit, Vídeo, Pòdcast, Infografia...
+  format: string; 
 }
 
 export interface ActivityPhase {
@@ -40,7 +40,7 @@ export interface ImprovedContent {
 export interface SummaryData {
   competencies: { code: string; definition: string }[];
   sabers: string[];
-  eixosEscola: { all: string[]; highlighted: string[] };
+  eixosEscola: { all: string[]; highlighted: string[] }; // Feminisme, Sostenibilitat, Territori, ODS
   ods: { all: string[]; highlighted: string[] };
   competenciesABP: { all: string[]; highlighted: string[] };
   bloom: { all: string[]; highlighted: string[] };
@@ -70,18 +70,17 @@ export enum AppStep {
 }
 
 export const EVALUATION_INSTRUMENTS = [
-  { name: 'Qüestionaris', desc: 'Instruments d’autoregulació i motivació per reflexionar sobre el que se sap i el que cal saber.' },
-  { name: 'Imatges, fotografies, vídeos', desc: 'Recollida de pensaments-clau a partir de suports visuals o audiovisuals.' },
-  { name: 'Organitzadors gràfics', desc: 'Bases d’orientació o Diagrames de fluix per planificar les accions de la tasca.' },
-  { name: 'Mapes i esquemes', desc: 'Mapes conceptuals, mentals o de pensament (Visual Thinking) per representar relacions.' },
-  { name: 'Línies de temps', desc: 'Ordenació de seqüències de fets per visualitzar la relació temporal.' },
-  { name: 'Diagrames (V de Gowin)', desc: 'Eina per interrelacionar idees teòriques amb els procediments emprats.' },
-  { name: 'Dianes d’avaluació', desc: 'Instrument visual per determinar el nivell d’assoliment en diverses dimensions.' },
-  { name: 'KPSI', desc: 'Qüestionari inicial i final per autoregular l’aprenentatge comparant el progrés.' },
-  { name: 'Rúbriques', desc: 'Taules que expliciten les expectatives i guien l’autoreflexió de l’alumne.' },
-  { name: 'Entrevistes / Converses', desc: 'Feedback efectiu durant el procés per conèixer preferències i motivacions.' },
-  { name: 'Observació d’aula', desc: 'Graelles de control de comportaments observables i criteris d’assoliment.' },
-  { name: 'Proves de coneixements', desc: 'Proves competencials per valorar l’assoliment dels sabers del currículum.' }
+  { name: 'Qüestionaris / KPSI', desc: 'Autoregulació i motivació. Per reflexionar sobre què sap i què cal saber.' },
+  { name: 'Imatges, fotos i vídeos', desc: 'Recollida de pensaments-clau a partir de suport visual.' },
+  { name: 'Bases d’orientació', desc: 'Organitzadors gràfics per anticipar i planificar les accions amb èxit.' },
+  { name: 'Mapes conceptuals / Mentals', desc: 'Representació visual de relacions entre conceptes o Visual Thinking.' },
+  { name: 'Línies de temps', desc: 'Ordenació de fets visualitzant la seva relació temporal.' },
+  { name: 'Diagrama UVE de Gowin', desc: 'Interrelació d’idees teòriques amb els procediments emprats.' },
+  { name: 'Dianes d’avaluació', desc: 'Visualització de nivells d’assoliment en diferents dimensions.' },
+  { name: 'Rúbriques', desc: 'Expectatives clares per guiar l’autoreflexió i la coavaluació.' },
+  { name: 'Entrevistes / Diàlegs', desc: 'Feedback efectiu durant el procés sobre preferències i motivacions.' },
+  { name: 'Observació d’aula', desc: 'Graelles de control d’actuacions o comportaments observables.' },
+  { name: 'Proves de coneixements', desc: 'Valoració competencial dels sabers del currículum.' }
 ];
 
 export const BLOOM_LEVELS = [
