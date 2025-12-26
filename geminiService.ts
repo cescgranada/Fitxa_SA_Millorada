@@ -11,7 +11,7 @@ REGLA DE RENDERITZAT:
 - Llenguatge adaptat a l'estudiant (claredat, motivació i autonomia).
 - Estructura neta i professional.
 
-Objectiu Final: Crear una "Guia de Treball" operativa perquè l'alumne sàpiga quines accions ha de realitzar per assolir l'output desitjat pel docent.`;
+L'objectiu final és crear una Guia de Treball que serveixi perquè l'alumne sàpiga en tot moment què ha de fer i com ho ha de fer.`;
 
 function robustJSONParse(text: string | undefined) {
   if (!text) throw new Error("La resposta està buida.");
@@ -59,25 +59,29 @@ export async function generateStudentGuide(
   groupingType: GroupingType, 
   memberCount: number, 
   userComments: string,
+  instrumentName: string,
   modelName: string
 ) {
-  const prompt = `CREA LA FITXA PER A L'ALUMNAT (Guia de Treball completa).
+  const prompt = `CREA LA FITXA PER A L'ALUMNAT (Guia de Treball).
   
-  Ets el pont entre el docent i l'alumne. Tradueix l'output triat en una missió clara per a l'estudiant.
+  Ets el pont entre el docent i l'alumne. Tradueix l'output triat i l'instrument d'avaluació en instruccions per a l'estudiant.
   
-  Dades del Docent:
-  - Contingut Base Millorat: ${JSON.stringify(improvedContent)}
-  - Missió de l'alumne (Output): ${selectedOutput}
-  - Organització: ${groupingType} ${groupingType === GroupingType.GRUP ? `(Equips de ${memberCount} persones)` : ''}
-  - Matisos del docent: ${userComments}
+  Configuració:
+  - Contingut: ${JSON.stringify(improvedContent)}
+  - Output (Missió): ${selectedOutput}
+  - Agrupament: ${groupingType} ${groupingType === GroupingType.GRUP ? `(Equips de ${memberCount})` : ''}
+  - Comentaris docent: ${userComments}
+  - Instrument d'avaluació que s'utilitzarà: ${instrumentName}
 
-  Estructura de la Guia de Treball:
-  1. Títol engrescador i repte inicial.
-  2. Instruccions Pas a Pas: Com realitzar l'output (${selectedOutput}) de manera operativa.
-  3. Logística: Com ens organitzem segons el format ${groupingType}.
-  4. Guia de Realització i Consells: Recomanacions pràctiques per tenir èxit en aquest format concret.
+  L'estructura de la fitxa ha de ser:
+  1. El Context (Situació o escenari).
+  2. Introducció/Història (si s'escau per motivar).
+  3. L'Objectiu de l'activitat (Què n'esperem?).
+  4. Descripció pas a pas del que ha de fer l'alumnat per assolir l'output (${selectedOutput}).
+  5. Producte o material final a lliurar (Adaptat a l'instrument d'avaluació: ${instrumentName}).
+  6. Guia de realització: Consells pràctics i d'èxit.
 
-  El to ha de ser encoratjador, clar i molt estructurat. Evita introduccions per a mestres, parla directament a l'alumne.`;
+  El to ha de ser encoratjador, clar i molt estructurat.`;
 
   const response = await ai.models.generateContent({
     model: modelName,
@@ -88,18 +92,25 @@ export async function generateStudentGuide(
   return response.text || "Error generant la guia.";
 }
 
-export async function generateEvaluation(content: string, instrumentName: string, modelName: string) {
-  const prompt = `Crea l'instrument d'avaluació "${instrumentName}" basat en la Guia de Treball següent: ${content}`;
-  const response = await ai.models.generateContent({
-    model: modelName,
-    contents: prompt,
-    config: { systemInstruction: SYSTEM_PROMPT }
-  });
-  return response.text;
-}
-
 export async function generateSummary(content: string, modelName: string) {
-  const prompt = `Analitza el vincle curricular (LOMLOE) de la següent fitxa: ${content}. Torna JSON.`;
+  const prompt = `Genera un resum curricular de la següent fitxa en format taula (JSON).
+  CONTINGUT: ${content}
+
+  RESTRICCIONS IMPORTANTS:
+  - Eixos de l'escola: MÀXIM 2 (Feminisme, Territori, Sostenibilitat i ODS).
+  - ODS: MÀXIM 2.
+  - Competències ABPxODS: MÀXIM 2.
+  - Sabers bàsics i Competències específiques segons LOMLOE.
+
+  Torna aquest JSON:
+  {
+    "competencies": ["..."],
+    "sabers": ["..."],
+    "eixosEscola": ["..."],
+    "ods": ["..."],
+    "competenciesABP": ["..."]
+  }`;
+
   const response = await ai.models.generateContent({
     model: modelName,
     contents: prompt,
@@ -108,5 +119,16 @@ export async function generateSummary(content: string, modelName: string) {
       responseMimeType: "application/json"
     }
   });
+
   return robustJSONParse(response.text);
+}
+
+export async function generateEvaluationFull(content: string, instrumentName: string, modelName: string) {
+  const prompt = `Genera l'instrument d'avaluació complet "${instrumentName}" basat en aquesta Guia de Treball: ${content}`;
+  const response = await ai.models.generateContent({
+    model: modelName,
+    contents: prompt,
+    config: { systemInstruction: SYSTEM_PROMPT }
+  });
+  return response.text;
 }

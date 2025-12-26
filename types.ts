@@ -37,7 +37,6 @@ export interface ImprovedContent {
   context: string;
   objectius: string[];
   desenvolupament: ActivityPhase[];
-  outputs: string[];
 }
 
 export interface PedagogicalAnalysis {
@@ -46,9 +45,9 @@ export interface PedagogicalAnalysis {
   selectedOutput?: string;
   improvementSuggestion: string;
   studentGuide: string;
-  groupingType?: GroupingType;
-  memberCount?: number;
-  userComments?: string;
+  groupingType: GroupingType;
+  memberCount: number;
+  userComments: string;
   evaluationInstrument?: string;
   selectedInstrumentName?: string;
   summaryTable?: {
@@ -64,8 +63,7 @@ export enum AppStep {
   UPLOAD = 1,
   ANALYSIS = 2,
   STUDENT_GUIDE = 3,
-  EVALUATION_SELECT = 4,
-  SUMMARY = 5
+  SUMMARY = 4
 }
 
 export const EVALUATION_INSTRUMENTS = [
